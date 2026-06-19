@@ -24,20 +24,20 @@ function App() {
         </div>
         <nav className="sidebar-nav">
           <a href="#" className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>
-            <LayoutDashboard size={20} /> Dashboard
+            <LayoutDashboard size={20} /> <span>Dashboard</span>
           </a>
           <a href="#" className={`nav-item ${activeTab === 'dispatch' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('dispatch'); }}>
-            <MapPin size={20} /> Dispatch Map
+            <MapPin size={20} /> <span>Dispatch Map</span>
           </a>
           <a href="#" className={`nav-item ${activeTab === 'fleet' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('fleet'); }}>
-            <Truck size={20} /> Fleet Management
+            <Truck size={20} /> <span>Fleet Management</span>
           </a>
           <a href="#" className={`nav-item ${activeTab === 'profits' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('profits'); }}>
-            <BarChart3 size={20} /> Profit Predictor
+            <BarChart3 size={20} /> <span>Profit Predictor</span>
           </a>
-          <div style={{ flex: 1 }}></div>
+          <div style={{ flex: 1, display: 'none' }} className="mobile-hide"></div>
           <a href="#" className="nav-item" onClick={(e) => { e.preventDefault(); setShowSettings(true); }}>
-            <Settings size={20} /> Settings
+            <Settings size={20} /> <span>Settings</span>
           </a>
         </nav>
       </aside>
