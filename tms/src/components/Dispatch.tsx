@@ -134,16 +134,16 @@ export default function Dispatch() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ padding: '32px 40px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="animate-fade-in page-container" style={{ padding: '32px 40px', height: '100%', display: 'flex', flexDirection: 'column' }}>
       
       {/* Main Header Section */}
       <div className="widget-header" style={{ marginBottom: '24px', alignItems: 'flex-start' }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h2 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '4px' }}>Dispatch Board</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Manage loads, assign drivers, and track active shipments.</p>
         </div>
         
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div className="dispatch-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', background: 'var(--bg-surface)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', gap: '4px' }}>
             <button 
               className="icon-button" 
@@ -197,7 +197,7 @@ export default function Dispatch() {
       {/* Content Area */}
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden' }}>
         {view === 'list' ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
+          <div style={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '800px' }}>
               <thead style={{ position: 'sticky', top: 0, background: 'rgba(26, 29, 36, 0.95)', backdropFilter: 'blur(8px)', zIndex: 10 }}>
                 <tr style={{ color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>

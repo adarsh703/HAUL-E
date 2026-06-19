@@ -35,7 +35,7 @@ export default function ProfitPredictor() {
     setLoading(false);
   };
   return (
-    <div className="animate-fade-in" style={{ padding: '40px' }}>
+    <div className="animate-fade-in page-container" style={{ padding: '40px' }}>
       <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>AI Profit Predictor</h2>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Analyze load profitability instantly based on historical data, fuel prices, and market trends.</p>
 

@@ -438,225 +438,334 @@ textarea::placeholder {
 }
 
 @media (max-width: 768px) {
+  /* ===== LAYOUT SHELL ===== */
   .app-container {
     flex-direction: column;
     height: 100vh;
-    height: 100dvh; /* Use dynamic viewport height */
+    height: 100dvh;
   }
-  
+
+  /* ===== BOTTOM NAV BAR (iOS/Android style) ===== */
   .sidebar {
     position: fixed;
     bottom: 0;
     left: 0;
+    right: 0;
     width: 100%;
     height: 70px;
     flex-direction: row;
     border-right: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(15, 17, 21, 0.85);
+    background: rgba(15, 17, 21, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     z-index: 1000;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
-    transition: none;
   }
-  
+
   .sidebar-header {
     display: none;
   }
-  
+
   .sidebar-nav {
     flex-direction: row;
-    padding: 0 12px;
+    padding: 0 8px;
     width: 100%;
-    justify-content: space-between;
+    justify-content: space-around;
     align-items: center;
+    gap: 0;
   }
-  
+
   .nav-item {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 8px 4px;
+    gap: 3px;
+    padding: 8px 2px;
     border-radius: 0;
     color: var(--text-secondary);
+    font-size: 12px;
   }
-  
+
+  .nav-item:hover {
+    transform: none;
+    background: transparent;
+  }
+
   .nav-item.active {
     background: transparent;
     border-left: none;
     color: var(--primary);
     transform: none;
-    border-bottom: none;
   }
-  
+
   .nav-item.active svg {
     filter: drop-shadow(0 2px 8px var(--primary-glow));
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     transition: all 0.2s;
   }
-  
+
   .nav-item span {
     display: block;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 500;
     opacity: 0.8;
+    text-align: center;
+    line-height: 1.2;
   }
-  
+
   .nav-item.active span {
     opacity: 1;
     font-weight: 700;
   }
-  
+
   .mobile-hide {
     display: none !important;
   }
 
+  /* ===== MAIN CONTENT AREA ===== */
   .main-content {
-    height: calc(100dvh - 70px);
-    padding-bottom: 100px; /* Space for bottom nav to scroll past */
+    height: 100dvh;
+    padding-bottom: 80px; /* Clear the bottom nav */
     overflow-y: auto;
     overflow-x: hidden;
   }
-  
+
+  /* ===== TOP HEADER ===== */
   .top-header {
     height: auto;
     padding: 16px;
     flex-direction: column-reverse;
-    gap: 16px;
-    background: rgba(15, 17, 21, 0.9);
+    gap: 12px;
+    background: rgba(15, 17, 21, 0.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     position: sticky;
     top: 0;
     z-index: 50;
-    align-items: stretch;
   }
-  
+
   .header-actions {
     width: 100%;
-    justify-content: flex-end;
-    gap: 12px;
-    position: static;
     display: flex;
+    justify-content: flex-end;
     align-items: center;
+    gap: 12px;
   }
-  
-  /* Create a fake logo for mobile header since sidebar logo is hidden */
+
   .top-header::after {
     content: "Haul-E TMS";
     position: absolute;
     left: 16px;
-    top: 24px;
+    top: 20px;
     font-weight: 700;
-    font-size: 20px;
+    font-size: 18px;
     background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  
+
   .search-bar {
     width: 100%;
+    max-width: 100% !important;
     margin: 0;
     padding: 10px 16px;
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-xl);
   }
-  
+
   .search-bar input {
     font-size: 14px;
   }
-  
+
+  /* ===== DASHBOARD GRID ===== */
   .dashboard-grid {
     grid-template-columns: 1fr !important;
-    padding: 16px;
-    gap: 16px;
+    padding: 16px !important;
+    gap: 14px !important;
   }
-  
-  .dashboard-grid > div, .stat-card, .main-widget, .side-widget {
-    grid-column: 1 / -1 !important; /* Force full width on mobile */
+
+  .dashboard-grid > * {
+    grid-column: 1 / -1 !important;
   }
-  
+
+  /* ===== CARDS ===== */
   .card {
     padding: 16px;
     border-radius: var(--radius-lg);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
   }
-  
+
+  .card:hover {
+    transform: none; /* Disable hover lift on mobile */
+  }
+
+  /* ===== STAT CARDS ===== */
   .stat-card {
-    flex-direction: column !important; /* Stack vertically so text wraps */
+    flex-direction: column !important;
     align-items: flex-start !important;
     gap: 8px !important;
+    padding: 20px !important;
   }
-  
+
   .stat-header {
     width: 100%;
-    margin-bottom: 4px;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
   }
-  
+
   .stat-value {
-    font-size: 28px;
-    line-height: 1;
+    font-size: 32px;
+    line-height: 1.1;
   }
-  
+
   .stat-trend {
-    margin-left: 0; /* remove auto so it aligns left */
-    white-space: normal; /* Allow long trend text to wrap */
+    margin-left: 0;
+    white-space: normal;
+    font-size: 12px;
   }
-  
+
+  /* ===== WIDGET HEADER ===== */
   .widget-header {
     padding-bottom: 12px;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 12px;
   }
-  
+
+  .widget-title {
+    font-size: 16px;
+  }
+
+  /* ===== MAP ===== */
   .map-container {
-    min-height: 250px;
+    min-height: 220px;
   }
-  
+
   .map-container iframe {
     border-radius: var(--radius-md);
   }
-  
-  /* Modals on mobile */
-  .card[style*="maxWidth: 600px"], 
-  .card[style*="maxWidth: 500px"], 
-  .card[style*="max-width: 600px"], 
-  .card[style*="max-width: 500px"] {
-    margin: 16px !important;
-    max-height: calc(100vh - 32px) !important;
-    border-radius: var(--radius-lg);
-  }
-  
-  .item-left {
-    gap: 12px;
-    max-width: 100%;
-  }
-  
-  .item-info {
-    overflow: hidden; /* prevent text from breaking flex container */
-    min-width: 0;
-  }
-  
-  .item-info h4 {
-    white-space: normal;
-    word-break: break-word;
-  }
-  
+
+  /* ===== LIST ITEMS (Recent Loads etc.) ===== */
   .list-item {
     padding: 12px 0;
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
   }
-  
+
+  .item-left {
+    gap: 10px;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1;
+  }
+
+  .item-info {
+    overflow: hidden;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .item-info h4 {
+    white-space: normal;
+    word-break: break-word;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .item-info p {
+    font-size: 11px;
+  }
+
+  .item-avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
   .status-badge {
-    padding: 4px 8px;
-    font-size: 10px;
+    padding: 3px 8px;
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+
+  /* ===== MODALS ===== */
+  .animate-fade-in[style*="position: fixed"] {
+    padding: 16px !important;
+  }
+
+  .animate-fade-in[style*="position: fixed"] > .card {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    margin: 0 !important;
+  }
+
+  /* ===== TABLES ===== */
+  table {
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 12px 10px !important;
+  }
+
+  /* ===== PAGE-LEVEL PADDING ===== */
+  .page-container {
+    padding: 16px !important;
+  }
+
+  .page-container h2 {
+    font-size: 20px !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* ===== DISPATCH ACTION BUTTONS ===== */
+  .dispatch-actions {
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 8px !important;
+  }
+
+  .dispatch-actions .icon-button {
+    font-size: 12px !important;
+    padding: 0 12px !important;
+    height: 36px;
+  }
+
+  /* ===== PROFIT PREDICTOR ===== */
+  .page-container .dashboard-grid .card[style*="gridColumn: 'span 4'"],
+  .page-container .dashboard-grid .card[style*="gridColumn: 'span 8'"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* ===== ADDITIONAL SMALL PHONE FIXES (iPhone SE etc.) ===== */
+@media (max-width: 390px) {
+  .nav-item span {
+    font-size: 8px;
+  }
+
+  .nav-item svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .stat-value {
+    font-size: 26px;
+  }
+
+  th, td {
+    padding: 10px 6px !important;
+    font-size: 12px;
   }
 }

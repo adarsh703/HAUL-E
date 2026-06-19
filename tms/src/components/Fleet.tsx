@@ -82,7 +82,7 @@ export default function Fleet() {
   const maintenanceCount = vehicles.filter(v => v.status === 'Maintenance').length;
 
   return (
-    <div className="animate-fade-in" style={{ padding: '40px' }}>
+    <div className="animate-fade-in page-container" style={{ padding: '40px' }}>
       <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Fleet & Driver Management</h2>
       
       <div className="dashboard-grid" style={{ padding: 0 }}>
@@ -117,13 +117,13 @@ export default function Fleet() {
             <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                  <th style={{ padding: '16px 8px' }}>Unit ID</th>
-                  <th>Type</th>
-                  <th>Assigned Driver</th>
-                  <th>Odometer</th>
-                  <th>Active Load</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th style={{ padding: '16px 10px' }}>Unit ID</th>
+                  <th style={{ padding: '16px 10px' }}>Type</th>
+                  <th style={{ padding: '16px 10px' }}>Assigned Driver</th>
+                  <th style={{ padding: '16px 10px' }}>Odometer</th>
+                  <th style={{ padding: '16px 10px' }}>Active Load</th>
+                  <th style={{ padding: '16px 10px' }}>Status</th>
+                  <th style={{ padding: '16px 10px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,19 +132,19 @@ export default function Fleet() {
                 ) : (
                   vehicles.map(u => (
                     <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                      <td style={{ padding: '16px 8px', fontWeight: 'bold' }}>{u.unit_id}</td>
-                      <td>{u.type}</td>
-                      <td>{u.driver}</td>
-                      <td>{u.miles}</td>
-                      <td>
+                      <td style={{ padding: '16px 10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{u.unit_id}</td>
+                      <td style={{ padding: '16px 10px', whiteSpace: 'nowrap' }}>{u.type}</td>
+                      <td style={{ padding: '16px 10px', maxWidth: '160px', wordBreak: 'break-word' }}>{u.driver}</td>
+                      <td style={{ padding: '16px 10px' }}>{u.miles}</td>
+                      <td style={{ padding: '16px 10px' }}>
                         {u.current_load && u.current_load !== 'None' ? (
                           <span style={{ color: 'var(--primary)', fontWeight: '500' }}>{u.current_load}</span>
                         ) : (
                           <span style={{ color: 'var(--text-secondary)' }}>No Load</span>
                         )}
                       </td>
-                      <td><span className={u.status === 'Active' ? "status-badge delivered" : "status-badge pending"}>{u.status}</span></td>
-                      <td>
+                      <td style={{ padding: '16px 10px' }}><span className={u.status === 'Active' ? "status-badge delivered" : "status-badge pending"}>{u.status}</span></td>
+                      <td style={{ padding: '16px 10px' }}>
                         <button 
                           onClick={() => trackTruck(u.unit_id)}
                           style={{ padding: '6px 12px', background: 'var(--primary)', color: 'var(--bg-base)', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
