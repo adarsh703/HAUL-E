@@ -517,7 +517,7 @@ textarea::placeholder {
 
   .main-content {
     height: calc(100dvh - 70px);
-    padding-bottom: 20px;
+    padding-bottom: 100px; /* Space for bottom nav to scroll past */
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -573,13 +573,13 @@ textarea::placeholder {
   }
   
   .dashboard-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
     padding: 16px;
     gap: 16px;
   }
   
-  .stat-card, .main-widget, .side-widget {
-    grid-column: span 1 !important;
+  .dashboard-grid > div, .stat-card, .main-widget, .side-widget {
+    grid-column: 1 / -1 !important; /* Force full width on mobile */
   }
   
   .card {
@@ -589,15 +589,16 @@ textarea::placeholder {
   }
   
   .stat-card {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
+    flex-direction: column !important; /* Stack vertically so text wraps */
+    align-items: flex-start !important;
+    gap: 8px !important;
   }
   
   .stat-header {
     width: 100%;
     margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
   }
   
   .stat-value {
@@ -606,11 +607,14 @@ textarea::placeholder {
   }
   
   .stat-trend {
-    margin-left: auto;
+    margin-left: 0; /* remove auto so it aligns left */
+    white-space: normal; /* Allow long trend text to wrap */
   }
   
   .widget-header {
     padding-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 16px;
   }
   
   .map-container {
@@ -633,10 +637,22 @@ textarea::placeholder {
   
   .item-left {
     gap: 12px;
+    max-width: 100%;
+  }
+  
+  .item-info {
+    overflow: hidden; /* prevent text from breaking flex container */
+    min-width: 0;
+  }
+  
+  .item-info h4 {
+    white-space: normal;
+    word-break: break-word;
   }
   
   .list-item {
     padding: 12px 0;
+    align-items: flex-start;
   }
   
   .status-badge {
