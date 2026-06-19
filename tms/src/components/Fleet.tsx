@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, AlertCircle, Wrench, Truck, MapPin, X, Plus } from 'lucide-react';
+import { ShieldAlert, Wrench, Truck, MapPin, X, Plus } from 'lucide-react';
 
 interface TrackingData {
   unit_id: string;
@@ -18,6 +18,7 @@ interface Vehicle {
   miles: string;
   service: string;
   status: string;
+  current_load?: string;
 }
 
 export default function Fleet() {

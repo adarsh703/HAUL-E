@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { DollarSign, TrendingUp, BarChart, Percent, Loader, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { TrendingUp, AlertCircle } from 'lucide-react';
 
 export default function ProfitPredictor() {
   const [origin, setOrigin] = useState('Chicago, IL');

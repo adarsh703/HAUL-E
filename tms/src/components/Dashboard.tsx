@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { TrendingUp, AlertCircle, CheckCircle2, Package, MapPin, Truck, Calendar, DollarSign, List, Plus, Trash2 } from 'lucide-react';
 
 interface Load {
@@ -23,7 +23,7 @@ interface Vehicle {
   status: string;
 }
 
-export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) => void }) {
+export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (tab: string) => void }) {
   const [loads, setLoads] = useState<Load[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
@@ -97,18 +97,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
   // Recent loads = last 10 loads reversed (newest first)
   const recentLoads = [...loads].reverse().slice(0, 10);
 
-  const handleAutoDispatch = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/dispatch/auto`, { method: 'POST' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.assignments && data.assignments.length > 0) {
-          alert(`Assigned ${data.assignments.length} loads automatically.`);
-        } else {
-          alert('No pending loads or available drivers found.');
-        }
-        fetchData();
-      });
-  };
+
 
   return (
     <div className="dashboard-grid animate-fade-in">
