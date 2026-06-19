@@ -41,11 +41,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
   };
 
   const fetchData = () => {
-    fetch('http://127.0.0.1:8000/api/loads')
+    fetch(`${import.meta.env.VITE_API_URL}/api/loads`)
       .then(res => res.json())
       .then(data => setLoads(Array.isArray(data) ? data : []))
       .catch(console.error);
-    fetch('http://127.0.0.1:8000/api/fleet')
+    fetch(`${import.meta.env.VITE_API_URL}/api/fleet`)
       .then(res => res.json())
       .then(data => setVehicles(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -54,7 +54,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
   const handleDeleteLoad = async (loadId: string) => {
     if (window.confirm('Are you sure you want to delete this load?')) {
       try {
-        await fetch(`http://127.0.0.1:8000/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
+        await fetch(`${import.meta.env.VITE_API_URL}/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
         setSelectedLoad(null);
         fetchData();
       } catch (err) {
@@ -98,7 +98,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
   const recentLoads = [...loads].reverse().slice(0, 10);
 
   const handleAutoDispatch = () => {
-    fetch('http://127.0.0.1:8000/api/dispatch/auto', { method: 'POST' })
+    fetch(`${import.meta.env.VITE_API_URL}/api/dispatch/auto`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.assignments && data.assignments.length > 0) {
@@ -381,7 +381,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
                       </div>
                       <button 
                         onClick={() => {
-                          const url = (selectedLoad as any).bol_path.replace('/home/no_one/Desktop/broker-bot/uploads', 'http://127.0.0.1:8000/uploads');
+                          const url = (selectedLoad as any).bol_path.replace('/home/no_one/Desktop/broker-bot/uploads', `${import.meta.env.VITE_API_URL}/uploads`);
                           window.open(url, '_blank');
                         }}
                         className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent' }}>View</button>
@@ -402,7 +402,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (tab: string) =>
                       </div>
                       <button 
                         onClick={() => {
-                          const url = (selectedLoad as any).pod_path.replace('/home/no_one/Desktop/broker-bot/uploads', 'http://127.0.0.1:8000/uploads');
+                          const url = (selectedLoad as any).pod_path.replace('/home/no_one/Desktop/broker-bot/uploads', `${import.meta.env.VITE_API_URL}/uploads`);
                           window.open(url, '_blank');
                         }}
                         className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent' }}>View</button>

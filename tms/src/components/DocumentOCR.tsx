@@ -12,7 +12,7 @@ export default function DocumentOCR() {
       formData.append('file', e.target.files[0]);
 
       try {
-        const res = await fetch('http://localhost:8000/api/ocr', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ocr`, {
           method: 'POST',
           body: formData,
         });
@@ -36,7 +36,7 @@ export default function DocumentOCR() {
         rate: ocrData.rate || '',
         status: 'Pending'
       };
-      await fetch('http://127.0.0.1:8000/api/loads', {
+      await fetch(`${import.meta.env.VITE_API_URL}/api/loads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
