@@ -325,11 +325,10 @@ OCR Text:
         # Skip if in driver channel or a thread under it (let driver_portal handle it)
         if message.channel.id == 1517447020791468122:
             return
-        if isinstance(message.channel, discord.Thread) and message.channel.parent_id == 1517447020791468122:
+        if isinstance(message.channel, discord.Thread) and getattr(message.channel, 'parent_id', None) == 1517447020791468122:
             return
-        # Skip load-creation channel (only for confirmations)
-        if message.channel.id == 1512055979259334730:
-            return
+
+        # No other hardcoded channel skips. If a user uploads a valid document, we process it.
 
         # Check if message has attachments
         if not message.attachments:
