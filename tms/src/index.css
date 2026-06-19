@@ -318,6 +318,12 @@ textarea::placeholder {
   margin-bottom: 24px;
 }
 
+.map-select {
+  width: auto;
+  max-width: 300px;
+  text-overflow: ellipsis;
+}
+
 .widget-title {
   font-size: 18px;
   font-weight: 600;
@@ -652,6 +658,12 @@ textarea::placeholder {
 
   .widget-title {
     font-size: 16px;
+  }
+
+  .map-select {
+    width: 100% !important;
+    max-width: 100%;
+    text-overflow: ellipsis;
   }
 
   /* ===== MAP ===== */

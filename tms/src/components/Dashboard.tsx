@@ -155,12 +155,13 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
         <div className="widget-header">
           <h3 className="widget-title">Live Dispatch Map</h3>
           <select 
+            className="map-select"
             onChange={(e) => {
               const ld = loads.find(l => l.id.toString() === e.target.value);
               setMapLoad(ld || null);
             }}
             value={mapLoad?.id || ''}
-            style={{ width: 'auto', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', outline: 'none' }}
+            style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', outline: 'none' }}
           >
             <option value="">Select Load for Map...</option>
             {activeLoads.map(l => (
