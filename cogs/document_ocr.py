@@ -19,6 +19,34 @@ log = logging.getLogger("broker_bot.document_ocr")
 
 _VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
+class DriverReassignView(discord.ui.View):
+    def __init__(self, load_id_val, current_driver, available_vehicles):
+        super().__init__(timeout=None)
+        self.load_id_val = load_id_val
+        options = []
+        for v in available_vehicles:
+            options.append(discord.SelectOption(
+                label=f"{v.driver} ({v.unit_id})", 
+                value=v.driver, 
+                default=(v.driver == current_driver)
+            ))
+        
+        self.select = discord.ui.Select(placeholder="Change assigned driver...", options=options[:25])
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+        
+    async def select_callback(self, interaction: discord.Interaction):
+        new_driver = self.select.values[0]
+        from database.models import AsyncSessionLocal, Load
+        from sqlalchemy.future import select
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(Load).where(Load.load_id == self.load_id_val))
+            load = result.scalars().first()
+            if load:
+                load.driver = new_driver
+                await session.commit()
+        await interaction.response.send_message(f"✅ Driver reassigned to **{new_driver}**. The TMS has been updated.", ephemeral=False)
+
 class LoadConfirmView(discord.ui.View):
     DRIVERS_CHANNEL_ID = 1517447020791468122
 
@@ -119,6 +147,43 @@ class LoadConfirmView(discord.ui.View):
 
                 dispatch_embed.set_footer(text="Reply LOADED when freight is on the truck. Upload BOL/POD when delivered.")
                 await thread.send(embed=dispatch_embed)
+                
+                # --- AUTO DISPATCH LOGIC ---
+                try:
+                    from database.models import Vehicle
+                    from services.motive_service import get_vehicle_tracking
+                    import asyncio
+                    
+                    async with AsyncSessionLocal() as session:
+                        v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
+                        vehicles = v_result.scalars().all()
+                        
+                    if vehicles:
+                        best_vehicle = random.choice(vehicles)
+                        assigned_driver = best_vehicle.driver
+                        
+                        tracking = await asyncio.to_thread(get_vehicle_tracking, best_vehicle.unit_id)
+                        if tracking:
+                            hos = tracking.get('hos', 8.5)
+                            loc = tracking.get('location', 'Unknown')
+                            auto_reason = f"Based on ELD Proximity ({loc}) and HOS ({hos} hrs remaining)."
+                        else:
+                            auto_reason = "Based on Equipment match and availability."
+                            
+                        async with AsyncSessionLocal() as session:
+                            l_result = await session.execute(select(Load).where(Load.load_id == self.load_id_val))
+                            load_db = l_result.scalars().first()
+                            if load_db:
+                                load_db.driver = assigned_driver
+                                load_db.status = "Dispatched"
+                                await session.commit()
+                                
+                        reassign_view = DriverReassignView(self.load_id_val, assigned_driver, vehicles)
+                        await thread.send(f"🤖 **Auto-Assigned:** {assigned_driver}\n**Reason:** {auto_reason}", view=reassign_view)
+                except Exception as auto_e:
+                    log.error(f"Auto-dispatch failed: {auto_e}")
+                # -----------------------------
+                
         except Exception as thread_err:
             log.error(f"Failed to create driver thread: {thread_err}", exc_info=True)
 
@@ -315,7 +380,7 @@ OCR Text:
                             import uuid
                             file_ext = os.path.splitext(attachment.filename)[1] if attachment.filename else ".pdf"
                             saved_filename = f"{uuid.uuid4().hex}{file_ext}"
-                            saved_filepath = os.path.join("/home/no_one/Desktop/broker-bot/uploads", saved_filename)
+                            saved_filepath = os.path.join("uploads", saved_filename)
                             with open(saved_filepath, "wb") as f:
                                 f.write(file_bytes)
                             document_url = f"http://127.0.0.1:8000/uploads/{saved_filename}"

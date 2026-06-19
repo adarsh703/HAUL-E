@@ -73,8 +73,8 @@ app.add_middleware(
 
 import os
 from fastapi.staticfiles import StaticFiles
-os.makedirs("/home/no_one/Desktop/broker-bot/uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="/home/no_one/Desktop/broker-bot/uploads"), name="uploads")
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 class LoadCreate(BaseModel):
     load_id: str

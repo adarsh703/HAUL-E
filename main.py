@@ -105,13 +105,17 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
 
 async def start_api():
     """Run the FastAPI server in the background."""
-    import uvicorn
-    import os
-    from api import app as fastapi_app
-    port = int(os.getenv("SERVER_PORT", "8000"))
-    config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=port, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
+    try:
+        import uvicorn
+        import os
+        from api import app as fastapi_app
+        port = int(os.getenv("SERVER_PORT", "20296"))
+        log.info(f"Starting FastAPI on port {port}...")
+        config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=port, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
+    except Exception as e:
+        log.error(f"FATAL: FastAPI server failed to start: {e}", exc_info=True)
 
 async def start_all():
     import asyncio

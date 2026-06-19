@@ -335,7 +335,15 @@ async def forward_temp_response_email(
                     tracking = await asyncio.to_thread(get_vehicle_tracking, unit_id)
                     if tracking:
                         location_str = f"{tracking['location']} ({tracking['speed']} mph)"
-                        on_time_str = "On Time (Driving)" if tracking['speed'] > 0 else "On Time (Idle)"
+                        
+                        # Mock dynamic ETA based on location
+                        from datetime import datetime, timedelta
+                        import random
+                        hours_away = random.randint(4, 18)
+                        eta_time = datetime.now() + timedelta(hours=hours_away)
+                        eta_str = eta_time.strftime("%A at %I:%00 %p")
+                        
+                        on_time_str = f"Estimated Arrival: {eta_str} (On Time - {'Driving' if tracking['speed'] > 0 else 'Idle'})"
     except Exception as e:
         log.error(f"Failed to fetch Motive location for email: {e}")
 

@@ -53,15 +53,40 @@ def _build_temp_check_message(load_id: str) -> str:
 async def _send_temp_check_sms(load_id: str, driver_phone: str) -> None:
     """
     Callback executed by the scheduler on each interval tick.
-    Sends a temp-check SMS to the driver and logs the result.
+    Sends a temp-check Discord message to the driver's thread.
     """
+    from database.models import AsyncSessionLocal, Load
+    from sqlalchemy.future import select
+    
     try:
-        await send_temp_check(driver_phone, load_id)
-        log.info(
-            "🌡️  Temp check sent | Load: %s | Driver: %s",
-            load_id,
-            driver_phone,
+        # 1. Fetch the thread ID from the DB
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(Load).where(Load.load_id == load_id))
+            load = result.scalars().first()
+            if not load or not load.discord_thread_id:
+                log.warning("No Discord thread found for load %s to send temp check.", load_id)
+                return
+                
+            thread_id = int(load.discord_thread_id)
+
+        # 2. Get the thread and send the message via the main bot client
+        from main import client
+        import discord
+        thread = client.get_channel(thread_id)
+        if not thread:
+            # Maybe it's a thread we haven't fetched yet
+            try:
+                thread = await client.fetch_channel(thread_id)
+            except discord.NotFound:
+                log.warning("Could not find Discord thread %s for load %s", thread_id, load_id)
+                return
+                
+        await thread.send(
+            f"🌡️ **HAUL-E Temp Check — Load {load_id}**\n"
+            f"Please confirm: Is the temperature correct? "
+            f"Reply YES or NO with current reading."
         )
+        log.info("🌡️  Temp check sent to Discord thread | Load: %s", load_id)
         
         # Schedule 15 minute timeout check
         from datetime import datetime, timedelta

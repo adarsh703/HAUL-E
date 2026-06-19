@@ -82,7 +82,7 @@ export default function ProfitPredictor() {
             </div>
           ) : prediction ? (
             <div className="animate-fade-in">
-              <div style={{ display: 'flex', gap: '40px', marginTop: '24px' }}>
+              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '24px' }}>
                 <div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Est. Cost (Overhead + Fuel)</p>
                   <h2 style={{ fontSize: '36px', marginTop: '4px', color: 'var(--danger)' }}>{prediction.fuel}</h2>
