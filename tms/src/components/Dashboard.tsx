@@ -41,11 +41,11 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
   };
 
   const fetchData = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/loads`)
+    fetch(`/api/loads`)
       .then(res => res.json())
       .then(data => setLoads(Array.isArray(data) ? data : []))
       .catch(console.error);
-    fetch(`${import.meta.env.VITE_API_URL}/api/fleet`)
+    fetch(`/api/fleet`)
       .then(res => res.json())
       .then(data => setVehicles(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -54,7 +54,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
   const handleDeleteLoad = async (loadId: string) => {
     if (window.confirm('Are you sure you want to delete this load?')) {
       try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
+        await fetch(`/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
         setSelectedLoad(null);
         fetchData();
       } catch (err) {

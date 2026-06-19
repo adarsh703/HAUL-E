@@ -41,7 +41,7 @@ export default function Dispatch() {
   };
 
   const fetchLoads = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/loads`)
+    fetch(`/api/loads`)
       .then(res => res.json())
       .then(data => {
         setLoads(Array.isArray(data) ? data.sort((a: Load, b: Load) => b.id - a.id) : []);
@@ -58,7 +58,7 @@ export default function Dispatch() {
     const interval = setInterval(fetchLoads, 10000);
     
     // Fetch settings
-    fetch(`${import.meta.env.VITE_API_URL}/api/settings`)
+    fetch(`/api/settings`)
       .then(res => res.json())
       .then(data => {
         setSettingsData({
@@ -75,7 +75,7 @@ export default function Dispatch() {
     e.preventDefault();
     setIsSavingSettings(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/settings`, {
+      const res = await fetch(`/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settingsData)
@@ -94,7 +94,7 @@ export default function Dispatch() {
 
   const handleCreateLoad = (e: React.FormEvent) => {
     e.preventDefault();
-    fetch(`${import.meta.env.VITE_API_URL}/api/loads`, {
+    fetch(`/api/loads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newLoad)
@@ -106,7 +106,7 @@ export default function Dispatch() {
   };
 
   const handleAutoDispatch = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/dispatch/auto`, { method: 'POST' })
+    fetch(`/api/dispatch/auto`, { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.assignments && data.assignments.length > 0) {
@@ -122,7 +122,7 @@ export default function Dispatch() {
   const handleDeleteLoad = async (loadId: string) => {
     if (window.confirm('Are you sure you want to delete this load?')) {
       try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
+        await fetch(`/api/loads/${encodeURIComponent(loadId)}`, { method: 'DELETE' });
         setToast('Load deleted successfully.');
         setTimeout(() => setToast(''), 4000);
         setSelectedLoad(null);

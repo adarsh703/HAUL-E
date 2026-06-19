@@ -32,7 +32,7 @@ export default function Fleet() {
     setShowTracking(true);
     setTrackingLoading(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/track/${unit_id}`);
+      const res = await fetch(`/api/track/${unit_id}`);
       const data = await res.json();
       setTrackingData(data);
     } catch (e) {
@@ -45,7 +45,7 @@ export default function Fleet() {
   const [newVehicle, setNewVehicle] = useState({ unit_id: '', type: 'Dry Van', driver: '', miles: '0', service: '', status: 'Active' });
 
   const fetchVehicles = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/fleet`)
+    fetch(`/api/fleet`)
       .then(res => res.json())
       .then(data => {
         setVehicles(data);
@@ -60,7 +60,7 @@ export default function Fleet() {
   const handleCreateVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/fleet`, {
+      await fetch(`/api/fleet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newVehicle)
