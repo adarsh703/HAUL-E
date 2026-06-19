@@ -80,7 +80,7 @@ function App() {
 
         {/* Settings Modal */}
         {showSettings && (
-          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '24px', overflowY: 'auto' }}>
             <div className="card" style={{ width: '100%', maxWidth: '500px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>Settings</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>Settings integration is currently in development.</p>
@@ -91,7 +91,7 @@ function App() {
 
         {/* Notifications Modal */}
         {showNotifications && (
-          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '24px', overflowY: 'auto' }}>
             <div className="card" style={{ width: '100%', maxWidth: '500px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '20px' }}>Notifications</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
@@ -115,7 +115,7 @@ function App() {
 
         {/* Profile Modal */}
         {showProfile && (
-          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+          <div className="animate-fade-in" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '24px', overflowY: 'auto' }}>
             <div className="card" style={{ width: '100%', maxWidth: '400px', textAlign: 'center' }}>
               <div className="item-avatar" style={{ width: '80px', height: '80px', fontSize: '24px', margin: '0 auto 16px', background: 'var(--primary-glow)', color: 'var(--primary)' }}>JD</div>
               <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '4px' }}>John Doe</h3>

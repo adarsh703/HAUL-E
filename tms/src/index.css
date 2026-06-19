@@ -534,16 +534,20 @@ textarea::placeholder {
     position: sticky;
     top: 0;
     z-index: 50;
+    align-items: stretch;
   }
   
   .header-actions {
     width: 100%;
     justify-content: flex-end;
     gap: 12px;
+    position: static;
+    display: flex;
+    align-items: center;
   }
   
   /* Create a fake logo for mobile header since sidebar logo is hidden */
-  .top-header::before {
+  .top-header::after {
     content: "Haul-E TMS";
     position: absolute;
     left: 16px;

@@ -113,53 +113,55 @@ export default function Fleet() {
               <Plus size={16} /> Add Truck
             </button>
           </div>
-          <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                <th style={{ padding: '16px 8px' }}>Unit ID</th>
-                <th>Type</th>
-                <th>Assigned Driver</th>
-                <th>Odometer</th>
-                <th>Active Load</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={6} style={{ padding: '16px', textAlign: 'center' }}>Loading...</td></tr>
-              ) : (
-                vehicles.map(u => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '16px 8px', fontWeight: 'bold' }}>{u.unit_id}</td>
-                    <td>{u.type}</td>
-                    <td>{u.driver}</td>
-                    <td>{u.miles}</td>
-                    <td>
-                      {u.current_load && u.current_load !== 'None' ? (
-                        <span style={{ color: 'var(--primary)', fontWeight: '500' }}>{u.current_load}</span>
-                      ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>No Load</span>
-                      )}
-                    </td>
-                    <td><span className={u.status === 'Active' ? "status-badge delivered" : "status-badge pending"}>{u.status}</span></td>
-                    <td>
-                      <button 
-                        onClick={() => trackTruck(u.unit_id)}
-                        style={{ padding: '6px 12px', background: 'var(--primary)', color: 'var(--bg-base)', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <MapPin size={14}/> Track
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '16px 8px' }}>Unit ID</th>
+                  <th>Type</th>
+                  <th>Assigned Driver</th>
+                  <th>Odometer</th>
+                  <th>Active Load</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} style={{ padding: '16px', textAlign: 'center' }}>Loading...</td></tr>
+                ) : (
+                  vehicles.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '16px 8px', fontWeight: 'bold' }}>{u.unit_id}</td>
+                      <td>{u.type}</td>
+                      <td>{u.driver}</td>
+                      <td>{u.miles}</td>
+                      <td>
+                        {u.current_load && u.current_load !== 'None' ? (
+                          <span style={{ color: 'var(--primary)', fontWeight: '500' }}>{u.current_load}</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-secondary)' }}>No Load</span>
+                        )}
+                      </td>
+                      <td><span className={u.status === 'Active' ? "status-badge delivered" : "status-badge pending"}>{u.status}</span></td>
+                      <td>
+                        <button 
+                          onClick={() => trackTruck(u.unit_id)}
+                          style={{ padding: '6px 12px', background: 'var(--primary)', color: 'var(--bg-base)', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={14}/> Track
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {showTracking && (
-        <div onClick={() => {setShowTracking(false); setTrackingData(null);}} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div onClick={() => {setShowTracking(false); setTrackingData(null);}} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: '24px' }}>
           <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '450px', padding: '24px', position: 'relative' }}>
             <button 
               onClick={() => {setShowTracking(false); setTrackingData(null);}} 
@@ -215,7 +217,7 @@ export default function Fleet() {
 
       {/* Modal - Add Vehicle */}
       {showAddModal && (
-        <div className="animate-fade-in" onClick={() => setShowAddModal(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' }}>
+        <div className="animate-fade-in" onClick={() => setShowAddModal(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '24px', overflowY: 'auto' }}>
           <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '500px', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
             <div style={{ padding: '24px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '20px', fontWeight: '600' }}>Add New Truck & Driver</h3>
