@@ -103,5 +103,32 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
     else:
         await interaction.followup.send("❌ An unexpected error occurred. Check bot-errors.log.", ephemeral=True)
 
+async def start_api():
+    """Run the FastAPI server in the background."""
+    import uvicorn
+    import os
+    from api import app as fastapi_app
+    port = int(os.getenv("SERVER_PORT", "8000"))
+    config = uvicorn.Config(fastapi_app, host="0.0.0.0", port=port, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+async def start_all():
+    import asyncio
+    # Start the API server in the background
+    api_task = asyncio.create_task(start_api())
+    
+    # Start the Discord bot
+    async with client:
+        await client.start(DISCORD_TOKEN)
+
 if __name__ == "__main__":
-    client.run(DISCORD_TOKEN, log_handler=None)
+    if not DISCORD_TOKEN:
+        log.error("No DISCORD_TOKEN found in .env! Exiting.")
+        exit(1)
+        
+    try:
+        import asyncio
+        asyncio.run(start_all())
+    except KeyboardInterrupt:
+        log.info("Bot shutting down manually.")

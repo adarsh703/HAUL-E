@@ -38,3 +38,10 @@ APScheduler>=3.10.0
 
 # Async HTTP client (for downloading Twilio media)
 httpx>=0.27.0
+
+# PDF Invoice Generation
+reportlab>=4.2.0
+
+# API Backend
+fastapi>=0.100.0
+uvicorn>=0.22.0
