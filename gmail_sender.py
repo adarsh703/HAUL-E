@@ -21,6 +21,8 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from email.mime.image import MIMEImage
 
 from dotenv import load_dotenv
 
@@ -83,11 +85,11 @@ def _send_via_smtp(to: str, subject: str, plain_body: str) -> None:
             "See README for App Password setup instructions."
         )
 
-    # Build MIME message (multipart/alternative = plain + HTML)
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
     msg["To"] = to
+    msg["Cc"] = GMAIL_USER
     msg["Reply-To"] = GMAIL_USER
 
     msg.attach(MIMEText(plain_body, "plain", "utf-8"))
@@ -100,7 +102,7 @@ def _send_via_smtp(to: str, subject: str, plain_body: str) -> None:
         server.starttls()
         server.ehlo()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, [to], msg.as_string())
+        server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
 
     log.info("✉️  Email delivered → %s | Subject: %s", to, subject)
 
@@ -132,3 +134,47 @@ async def send_broker_email(
     subject = _build_subject(lane)
     log.info("Dispatching email | To: %s (%s) | Lane: %s", broker_name, to, lane)
     await asyncio.to_thread(_send_via_smtp, to, subject, body)
+
+def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str, bol_path: str = None) -> None:
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        raise EnvironmentError("GMAIL_USER or GMAIL_APP_PASSWORD is missing from .env.")
+
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
+    msg["To"] = to
+    msg["Cc"] = GMAIL_USER
+    msg["Reply-To"] = GMAIL_USER
+
+    # Attach text body
+    text_part = MIMEMultipart("alternative")
+    text_part.attach(MIMEText(plain_body, "plain", "utf-8"))
+    text_part.attach(MIMEText(_build_html_body(plain_body), "html", "utf-8"))
+    msg.attach(text_part)
+
+    # Attach PDF Invoice
+    if os.path.exists(pdf_path):
+        with open(pdf_path, "rb") as f:
+            pdf_attachment = MIMEApplication(f.read(), _subtype="pdf")
+            pdf_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
+            msg.attach(pdf_attachment)
+
+    # Attach BOL Image
+    if bol_path and os.path.exists(bol_path):
+        with open(bol_path, "rb") as f:
+            from email.mime.image import MIMEImage
+            bol_attachment = MIMEImage(f.read())
+            bol_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(bol_path))
+            msg.attach(bol_attachment)
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
+
+async def send_invoice_email(to: str, load_id: str, pdf_path: str, bol_path: str = None) -> None:
+    subject = f"Invoice & BOL for Load {load_id} | {COMPANY_NAME}"
+    body = f"Hello,\n\nPlease find attached the Invoice and Proof of Delivery (BOL) for Load {load_id}.\nLet us know if you need any further information.\n\nThank you,\n{COMPANY_NAME}"
+    await asyncio.to_thread(_send_invoice_via_smtp, to, subject, body, pdf_path, bol_path)

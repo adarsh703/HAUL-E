@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # ─── PostgreSQL Database ────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: haule-postgres
+    environment:
+      POSTGRES_DB: haule_tms
+      POSTGRES_USER: haule
+      POSTGRES_PASSWORD: haule_dev_2026
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U haule -d haule_tms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API ────────────────────────────────────────────────
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: haule-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://haule:haule_dev_2026@postgres:5432/haule_tms
+      GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
+      GOOGLE_LOCATION: ${GOOGLE_LOCATION}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GOOGLE_CREDENTIALS_FILE: /app/google_credentials.json
+    volumes:
+      - ./google_credentials.json:/app/google_credentials.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Discord Bot ────────────────────────────────────────────────
+  bot:
+    build:
+      context: ./services/bot
+      dockerfile: Dockerfile
+    container_name: haule-bot
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      API_BASE_URL: http://api:8000
+    depends_on:
+      - api
+
+  # ─── Next.js Dashboard ─────────────────────────────────────────
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: haule-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

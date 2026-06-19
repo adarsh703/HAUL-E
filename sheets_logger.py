@@ -211,6 +211,67 @@ async def append_outreach_log(
         _append_row, broker_name, broker_email, lane, date, status, email_preview
     )
 
+def _append_load_row(
+    load_id: str,
+    broker: str,
+    origin_dest: str,
+    pickup_date: str,
+    rate: str,
+) -> None:
+    if not SPREADSHEET_ID:
+        return
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    row = [timestamp, load_id, broker, origin_dest, pickup_date, rate]
+    service = _get_sheets_service()
+    safe_tab = "'Loads Log'"
+    try:
+        service.spreadsheets().values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{safe_tab}!A1",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
+    except HttpError as e:
+        if e.resp.status == 400 and "Unable to parse range" in str(e):
+            # Create the tab if it doesn't exist
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body={
+                    "requests": [{
+                        "addSheet": {
+                            "properties": {"title": "Loads Log"}
+                        }
+                    }]
+                }
+            ).execute()
+            # Write headers
+            service.spreadsheets().values().update(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{safe_tab}!A1",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["Timestamp", "Load ID", "Broker", "Origin → Destination", "Pickup Date", "Rate"]]},
+            ).execute()
+            # Retry append
+            service.spreadsheets().values().append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"{safe_tab}!A1",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body={"values": [row]},
+            ).execute()
+        else:
+            raise
+
+async def append_load_log(
+    load_id: str,
+    broker: str,
+    origin_dest: str,
+    pickup_date: str,
+    rate: str,
+) -> None:
+    await asyncio.to_thread(_append_load_row, load_id, broker, origin_dest, pickup_date, rate)
+
 
 async def ensure_headers() -> None:
     """

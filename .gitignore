@@ -21,6 +21,11 @@ ENV/
 google_credentials.json
 *.json.bak
 
+# ── Databases & Uploads ───────────────────────────────────────────────────────
+*.db
+*.sqlite
+uploads/
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 logs/

@@ -5,12 +5,28 @@ def create_katabump_zip():
     zip_filename = "katabump_deploy.zip"
     
     # Files/directories to exclude
-    exclude_dirs = {'.git', 'venv', '__pycache__', '.idea', '.vscode'}
+    exclude_dirs = {
+        '.git', 'venv', '__pycache__', '.idea', '.vscode', 
+        'node_modules', '.next', 'dashboard', 'hilarious-houston', 'tms',
+        'api', 'bot' # these are inside services/api and services/bot which are old duplicates
+    }
     exclude_files = {
         '.env',                   # Keep secrets out of ZIP; set them in Katabump dashboard
         'broker_bot.log',         # Don't include old logs
+        'api.log',
+        'ngrok.log',
+        'bot-errors.log',
         'katabump_deploy.zip',
-        'build_katabump_zip.py'
+        'build_katabump_zip.py',
+        'broker.db',              # Empty old db
+        'bot_database.db',        # NEVER INCLUDE LIVE DATABASE
+        'docker-compose.yml',
+        'plan_b.md',
+        'Plan_B_Executive_Proposal.pdf',
+        'test_twilio.py',
+        'test_ocr.py',
+        'test_single_rc.py',
+        'test_approval.py'
     }
     
     # Files that MUST be included, even if they match some generic exclusion (though we don't have generic exclusions here)
