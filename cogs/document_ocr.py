@@ -367,89 +367,89 @@ Extract data directly from the attached document.
 
                     load_data = await self.extract_load_json(file_bytes, mime_type, message.content)
                         
-                        if load_data:
-                            # Save file locally
-                            import uuid
-                            file_ext = os.path.splitext(attachment.filename)[1] if attachment.filename else ".pdf"
-                            saved_filename = f"{uuid.uuid4().hex}{file_ext}"
-                            saved_filepath = os.path.join("uploads", saved_filename)
-                            with open(saved_filepath, "wb") as f:
-                                f.write(file_bytes)
-                            document_url = f"http://127.0.0.1:8000/uploads/{saved_filename}"
+                    if load_data:
+                        # Save file locally
+                        import uuid
+                        file_ext = os.path.splitext(attachment.filename)[1] if attachment.filename else ".pdf"
+                        saved_filename = f"{uuid.uuid4().hex}{file_ext}"
+                        saved_filepath = os.path.join("uploads", saved_filename)
+                        with open(saved_filepath, "wb") as f:
+                            f.write(file_bytes)
+                        document_url = f"http://127.0.0.1:8000/uploads/{saved_filename}"
 
-                            # 1. Map Intelligence JSON to basic DB Schema
-                            load_info = load_data.get('load_information', {})
-                            stops = load_data.get('stops', [])
-                            financials = load_data.get('financials', {})
-                            ops_intel = load_data.get('operational_intelligence', {})
+                        # 1. Map Intelligence JSON to basic DB Schema
+                        load_info = load_data.get('load_information', {})
+                        stops = load_data.get('stops', [])
+                        financials = load_data.get('financials', {})
+                        ops_intel = load_data.get('operational_intelligence', {})
+                        
+                        pickup_stop = next((s for s in stops if 'Pickup' in s.get('stop_type', '')), stops[0] if stops else {})
+                        delivery_stop = next((s for s in reversed(stops) if 'Delivery' in s.get('stop_type', '')), stops[-1] if len(stops) > 1 else {})
+                        
+                        origin_str = pickup_stop.get('city_state') or pickup_stop.get('address') or 'Unknown'
+                        dest_str = delivery_stop.get('city_state') or delivery_stop.get('address') or 'Unknown'
+                        origin_dest = f"{origin_str} → {dest_str}"
+                        
+                        pickup_date = pickup_stop.get('appointment_date') or 'Unknown'
+                        rate_val = financials.get('total_revenue') or load_info.get('revenue', '0')
+                        broker = load_info.get('customer') or 'Unknown'
+                        
+                        # Use actual broker load number instead of random
+                        load_id_val = load_info.get('broker_load_number')
+                        if not load_id_val:
+                            load_id_val = f"#L-{random.randint(1000, 9999)}"
+                        elif not load_id_val.startswith('#'):
+                            load_id_val = f"#{load_id_val}"
                             
-                            pickup_stop = next((s for s in stops if 'Pickup' in s.get('stop_type', '')), stops[0] if stops else {})
-                            delivery_stop = next((s for s in reversed(stops) if 'Delivery' in s.get('stop_type', '')), stops[-1] if len(stops) > 1 else {})
+                        # Removed immediate DB and Sheets insertion
+                        
+                        # 3. Rich Discord Reply with Confirmation View
+                        score = ops_intel.get('dispatch_readiness_score', 0)
+                        summary = ops_intel.get('dispatcher_summary', 'No summary generated.')
+                        risk = ops_intel.get('risk_analysis', {}).get('classification', 'Unknown')
+                        alerts = ops_intel.get('alerts', [])
+                        alerts_str = "\n".join([f"⚠️ {a}" for a in alerts]) if alerts else "None"
+                        
+                        embed = discord.Embed(
+                            title=f"✅ Load {load_id_val} Processed",
+                            color=0x10b981
+                        )
+                        embed.add_field(name="📍 Lane", value=origin_dest, inline=False)
+                        embed.add_field(name="💰 Rate", value=f"${rate_val}", inline=True)
+                        embed.add_field(name="📊 Readiness Score", value=f"{score}/100", inline=True)
+                        
+                        risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
+                        embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
+                        
+                        embed.add_field(name="🧠 Dispatcher Summary", value=summary, inline=False)
+                        
+                        if alerts:
+                            embed.add_field(name="🚨 Actionable Alerts", value=alerts_str, inline=False)
                             
-                            origin_str = pickup_stop.get('city_state') or pickup_stop.get('address') or 'Unknown'
-                            dest_str = delivery_stop.get('city_state') or delivery_stop.get('address') or 'Unknown'
-                            origin_dest = f"{origin_str} → {dest_str}"
-                            
-                            pickup_date = pickup_stop.get('appointment_date') or 'Unknown'
-                            rate_val = financials.get('total_revenue') or load_info.get('revenue', '0')
-                            broker = load_info.get('customer') or 'Unknown'
-                            
-                            # Use actual broker load number instead of random
-                            load_id_val = load_info.get('broker_load_number')
-                            if not load_id_val:
-                                load_id_val = f"#L-{random.randint(1000, 9999)}"
-                            elif not load_id_val.startswith('#'):
-                                load_id_val = f"#{load_id_val}"
-                                
-                            # Removed immediate DB and Sheets insertion
-                            
-                            # 3. Rich Discord Reply with Confirmation View
-                            score = ops_intel.get('dispatch_readiness_score', 0)
-                            summary = ops_intel.get('dispatcher_summary', 'No summary generated.')
-                            risk = ops_intel.get('risk_analysis', {}).get('classification', 'Unknown')
-                            alerts = ops_intel.get('alerts', [])
-                            alerts_str = "\n".join([f"⚠️ {a}" for a in alerts]) if alerts else "None"
-                            
-                            embed = discord.Embed(
-                                title=f"✅ Load {load_id_val} Processed",
-                                color=0x10b981
-                            )
-                            embed.add_field(name="📍 Lane", value=origin_dest, inline=False)
-                            embed.add_field(name="💰 Rate", value=f"${rate_val}", inline=True)
-                            embed.add_field(name="📊 Readiness Score", value=f"{score}/100", inline=True)
-                            
-                            risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
-                            embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
-                            
-                            embed.add_field(name="🧠 Dispatcher Summary", value=summary, inline=False)
-                            
-                            if alerts:
-                                embed.add_field(name="🚨 Actionable Alerts", value=alerts_str, inline=False)
-                                
-                            embed.set_footer(text="Awaiting Confirmation")
-                            
-                            view = LoadConfirmView(
-                                bot=self.bot,
-                                load_data=load_data,
-                                document_url=document_url,
-                                load_id_val=load_id_val,
-                                origin_dest=origin_dest,
-                                pickup_date=pickup_date,
-                                rate_val=rate_val,
-                                ops_intel=ops_intel,
-                                broker=broker,
-                                original_message=message
-                            )
+                        embed.set_footer(text="Awaiting Confirmation")
+                        
+                        view = LoadConfirmView(
+                            bot=self.bot,
+                            load_data=load_data,
+                            document_url=document_url,
+                            load_id_val=load_id_val,
+                            origin_dest=origin_dest,
+                            pickup_date=pickup_date,
+                            rate_val=rate_val,
+                            ops_intel=ops_intel,
+                            broker=broker,
+                            original_message=message
+                        )
 
-                            confirmation_channel = self.bot.get_channel(1512055979259334730)
-                            if confirmation_channel:
-                                await confirmation_channel.send(f"New Load Document uploaded by {message.author.mention}", embed=embed, view=view)
-                                await message.reply("📄 Document processed. Awaiting confirmation in the load creation channel.")
-                            else:
-                                # Fallback to replying in the same channel if confirmation channel not found
-                                await message.reply(embed=embed, view=view)
+                        confirmation_channel = self.bot.get_channel(1512055979259334730)
+                        if confirmation_channel:
+                            await confirmation_channel.send(f"New Load Document uploaded by {message.author.mention}", embed=embed, view=view)
+                            await message.reply("📄 Document processed. Awaiting confirmation in the load creation channel.")
                         else:
-                            await message.reply("❌ Could not extract load data from the document.")
+                            # Fallback to replying in the same channel if confirmation channel not found
+                            await message.reply(embed=embed, view=view)
+                    else:
+                        await message.reply("❌ Could not extract load data from the document.")
                 except Exception as e:
                     log.error(f"OCR processing failed for attachment {attachment.filename}: {e}", exc_info=True)
                     await message.reply("❌ An error occurred while processing the document.")
