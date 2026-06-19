@@ -1,9 +1,6 @@
 import discord
 from discord.ext import commands
 import logging
-import pytesseract
-from pdf2image import convert_from_bytes
-from PIL import Image
 import io
 import json
 from google import genai
@@ -218,7 +215,7 @@ class DocumentOCR(commands.Cog):
         )
         self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-    async def extract_load_json(self, ocr_text: str, user_text: str) -> dict:
+    async def extract_load_json(self, file_bytes: bytes, mime_type: str, user_text: str) -> dict:
         try:
             prompt = f"""
 You are the intelligence layer of a modern Transportation Management System (TMS).
@@ -304,12 +301,12 @@ CRITICAL RULES:
 User Message:
 {user_text}
 
-OCR Text:
-{ocr_text[:10000]}
+Extract data directly from the attached document.
 """
+            document_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
             response = await self.gemini_client.aio.models.generate_content(
                 model=self.model,
-                contents=prompt
+                contents=[document_part, prompt]
             )
             raw_json = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(raw_json)
@@ -348,31 +345,27 @@ OCR Text:
                 # Trigger OCR
                 try:
                     file_bytes = await attachment.read()
-                    extracted_text = ""
                     
-                    # Convert to image if PDF, or just read if image
-                    is_pdf = False
-                    if attachment.content_type and "application/pdf" in attachment.content_type:
-                        is_pdf = True
-                    elif filename_lower.endswith('.pdf'):
-                        is_pdf = True
-
-                    if is_pdf:
-                        images = convert_from_bytes(file_bytes)
-                        for img in images:
-                            extracted_text += pytesseract.image_to_string(img) + "\n"
-                    else:
-                        img = Image.open(io.BytesIO(file_bytes))
-                        extracted_text = pytesseract.image_to_string(img)
-
-                    if extracted_text.strip():
-                        # Inform user
-                        try:
-                            await message.add_reaction("📄")
-                        except Exception as react_err:
-                            log.warning(f"Could not add reaction to message: {react_err}")
+                    # Inform user
+                    try:
+                        await message.add_reaction("📄")
+                    except Exception as react_err:
+                        log.warning(f"Could not add reaction to message: {react_err}")
                         
-                        load_data = await self.extract_load_json(extracted_text, message.content)
+                    mime_type = attachment.content_type
+                    if not mime_type:
+                        if filename_lower.endswith('.pdf'):
+                            mime_type = 'application/pdf'
+                        elif filename_lower.endswith(('.jpg', '.jpeg')):
+                            mime_type = 'image/jpeg'
+                        elif filename_lower.endswith('.png'):
+                            mime_type = 'image/png'
+                        elif filename_lower.endswith('.webp'):
+                            mime_type = 'image/webp'
+                        else:
+                            mime_type = 'application/pdf'
+
+                    load_data = await self.extract_load_json(file_bytes, mime_type, message.content)
                         
                         if load_data:
                             # Save file locally
