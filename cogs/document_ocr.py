@@ -64,15 +64,32 @@ class LoadConfirmView(discord.ui.View):
     async def create_load_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
 
-        # 1. Save to DB
+        # 1. Save to DB with Auto-Assign
         async with AsyncSessionLocal() as session:
+            from database.models import Vehicle
+            from sqlalchemy.future import select
+            v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
+            active_vehicles = v_result.scalars().all()
+            
+            assigned_driver = 'Unassigned'
+            assigned_status = self.ops_intel.get('workflow_state', 'Pending')
+            assigned_phone = None
+            
+            if active_vehicles:
+                # Auto-Assign to first available truck
+                best_truck = active_vehicles[0]
+                assigned_driver = best_truck.driver
+                assigned_phone = best_truck.phone
+                assigned_status = 'Dispatched'
+                
             new_load = Load(
                 load_id=self.load_id_val,
                 origin_dest=self.origin_dest,
                 pickup_date=self.pickup_date,
-                driver='Unassigned',
+                driver=assigned_driver,
+                driver_phone=assigned_phone,
                 rate=str(self.rate_val),
-                status=self.ops_intel.get('workflow_state', 'Pending'),
+                status=assigned_status,
                 document_url=self.document_url,
                 operational_intelligence=json.dumps(self.load_data)
             )
@@ -179,8 +196,31 @@ class LoadConfirmView(discord.ui.View):
                         await thread.send(f"🤖 **Auto-Assigned:** {assigned_driver}\n**Reason:** {auto_reason}", view=reassign_view)
                 except Exception as auto_e:
                     log.error(f"Auto-dispatch failed: {auto_e}")
+                    
+                # --- AUTOMATED TRACKING & TEMP CHECKS ---
+                try:
+                    from services.temp_checker import start_temp_checks
+                    from services.twilio_sms import forward_silent_location_email
+                    import asyncio
+                    
+                    # 1. Start Temp checks if Reefer
+                    is_reefer = False
+                    if self.load_data.get("reefer_operations"):
+                        setpoint = self.load_data["reefer_operations"].get("temperature_setpoint")
+                        if setpoint and setpoint != "":
+                            is_reefer = True
+                    
+                    if is_reefer and vehicles:
+                        # Assuming best_vehicle was chosen
+                        start_temp_checks(self.load_id_val, best_vehicle.phone, interval_hours=3)
+                        
+                    # 2. Start initial ETA/Location update right now for demonstration
+                    shipper_email = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
+                    asyncio.create_task(forward_silent_location_email(shipper_email, self.load_id_val))
+                    
+                except Exception as tracker_e:
+                    log.error(f"Failed to start auto-tracking/temp checks: {tracker_e}")
                 # -----------------------------
-                
         except Exception as thread_err:
             log.error(f"Failed to create driver thread: {thread_err}", exc_info=True)
 
