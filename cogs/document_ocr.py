@@ -288,29 +288,17 @@ class LoadConfirmView(discord.ui.View):
                     except Exception as auto_e:
                         log.error(f"Auto-dispatch failed: {auto_e}")
                     
-                # --- AUTOMATED TRACKING & TEMP CHECKS ---
+                # --- AUTOMATED TRACKING ---
                 try:
-                    from services.temp_checker import start_temp_checks
                     from services.twilio_sms import forward_silent_location_email
                     import asyncio
                     
-                    # 1. Start Temp checks if Reefer
-                    is_reefer = False
-                    if self.load_data.get("reefer_operations"):
-                        setpoint = self.load_data["reefer_operations"].get("temperature_setpoint")
-                        if setpoint and setpoint != "":
-                            is_reefer = True
-                    
-                    if is_reefer and vehicles:
-                        # Assuming best_vehicle was chosen
-                        start_temp_checks(self.load_id_val, getattr(best_vehicle, 'phone', None), interval_hours=3)
-                        
-                    # 2. Start initial ETA/Location update right now for demonstration
+                    # Start initial ETA/Location update right now for demonstration
                     shipper_email = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
                     asyncio.create_task(forward_silent_location_email(shipper_email, self.load_id_val))
                     
                 except Exception as tracker_e:
-                    log.error(f"Failed to start auto-tracking/temp checks: {tracker_e}")
+                    log.error(f"Failed to start auto-tracking: {tracker_e}")
                 # -----------------------------
         except Exception as thread_err:
             log.error(f"Failed to create driver thread: {thread_err}", exc_info=True)
