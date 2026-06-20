@@ -188,54 +188,67 @@ class LoadConfirmView(discord.ui.View):
                         load.discord_thread_id = str(thread.id)
                         await session.commit()
 
-                # Post dispatch summary in thread
-                load_info = self.load_data.get('load_information', {})
+                # Construct Plaintext Dispatch Message
+                driver_name = assigned_driver if assigned_driver else "Unassigned"
+                truck_number = "Unknown"
+                trailer_number = "Unknown"
+                
+                if assigned_driver and assigned_driver != "Unassigned":
+                    from database.models import Vehicle, AsyncSessionLocal
+                    from sqlalchemy.future import select
+                    async with AsyncSessionLocal() as session:
+                        v_result = await session.execute(select(Vehicle).where(Vehicle.driver == assigned_driver))
+                        vehicle = v_result.scalars().first()
+                        if vehicle:
+                            truck_number = vehicle.unit_id
+
+                message_lines = [
+                    f"**Hello Driver, your dispatch is:**",
+                    f"#{self.load_id_val} Dispatch",
+                    f"Truck: {truck_number}",
+                    f"Trailer: {trailer_number}",
+                    f"Driver: {driver_name.upper()}",
+                    ""
+                ]
+                
                 stops = self.load_data.get('stops', [])
-                reefer = self.load_data.get('reefer_operations', {})
-
-                dispatch_embed = discord.Embed(
-                    title=f"📋 Dispatch Details — {self.load_id_val}",
-                    color=0x3b82f6
-                )
-                origin_str, dest_str = self.origin_dest.split(" → ") if " → " in self.origin_dest else (self.origin_dest, "Unknown")
-                dispatch_embed.add_field(name="📍 Origin", value=origin_str, inline=True)
-                dispatch_embed.add_field(name="🏁 Destination", value=dest_str, inline=True)
-                dispatch_embed.add_field(name="📅 Pickup Date", value=self.pickup_date, inline=True)
-                dispatch_embed.add_field(name="💰 Rate", value=f"${self.rate_val}", inline=True)
-                dispatch_embed.add_field(name="📦 Commodity", value=load_info.get('commodity', 'N/A'), inline=True)
-                dispatch_embed.add_field(name="⚖️ Weight", value=load_info.get('weight', 'N/A'), inline=True)
-                dispatch_embed.add_field(name="🚛 Equipment", value=load_info.get('equipment_type', 'N/A'), inline=True)
-                temp = reefer.get('temperature_setpoint') or load_info.get('temperature_requirements', 'N/A')
-                dispatch_embed.add_field(name="🌡️ Temperature", value=temp, inline=True)
-
-                broker_contact = []
-                if load_info.get('broker_email'): broker_contact.append(f"📧 {load_info['broker_email']}")
-                if load_info.get('broker_phone'): broker_contact.append(f"📞 {load_info['broker_phone']}")
-                if broker_contact:
-                    dispatch_embed.add_field(name="👔 Broker Contact", value="\n".join(broker_contact), inline=False)
-
-                # Add stop details
                 for i, stop in enumerate(stops):
                     stop_type = stop.get('stop_type', 'Stop')
                     company = stop.get('company_name', 'N/A')
-                    address = stop.get('address', 'N/A')
+                    
+                    addr = stop.get('address', '')
+                    city = stop.get('city_state', '')
+                    address_full = f"{addr}, {city}".strip(', ') if addr or city else 'N/A'
+                    
+                    phone = stop.get('phone', 'N/A')
                     appt = f"{stop.get('appointment_date', '')} {stop.get('appointment_time', '')}".strip() or 'N/A'
-                    instructions = stop.get('instructions', '')
-                    stop_text = f"**{company}**\n{address}\n📅 {appt}"
-                    if instructions:
-                        if len(instructions) > 200:
-                            instructions = instructions[:197] + "..."
-                        stop_text += f"\n> 📝 *{instructions}*"
-                    dispatch_embed.add_field(name=f"{'📦' if 'Pickup' in stop_type else '📬'} Stop {i+1}: {stop_type}", value=stop_text, inline=False)
-
+                    instructions = stop.get('instructions', 'None')
+                    
+                    refs = stop.get('reference_numbers', [])
+                    ref_str = ", ".join(refs) if refs else "N/A"
+                    
+                    message_lines.append(f"{i+1}. {stop_type} info:")
+                    message_lines.append(f"Name: {company}")
+                    message_lines.append(f"Address: {address_full}")
+                    message_lines.append(f"Phone: {phone}")
+                    message_lines.append(f"Number: {ref_str}")
+                    message_lines.append(f"Appointment Date: {appt}")
+                    message_lines.append(f"Stop Type: {stop_type}")
+                    message_lines.append(f"Note: {instructions}")
+                    message_lines.append("")
+                    
                 ops_intel = self.load_data.get('operational_intelligence', {})
                 alerts = ops_intel.get('alerts', [])
                 if alerts:
-                    alerts_str = "\n".join([f"• {a}" for a in alerts])
-                    dispatch_embed.add_field(name="🚨 Alerts & Requirements", value=alerts_str[:1021] + "..." if len(alerts_str) > 1024 else alerts_str, inline=False)
-
-                dispatch_embed.set_footer(text="Reply LOADED and attach BOL at pickup. Reply DELIVERED and attach POD at destination.")
-                await thread.send(embed=dispatch_embed)
+                    message_lines.append("EXTRA IMPORTANT DETAILS:")
+                    for alert in alerts:
+                        message_lines.append(f"- {alert}")
+                    message_lines.append("")
+                
+                message_lines.append("Reply OK if received")
+                
+                dispatch_text = "\n".join(message_lines)
+                await thread.send(dispatch_text)
                 
                 # --- AUTO DISPATCH LOGIC ---
                 if self.selected_driver == 'Unassigned':
