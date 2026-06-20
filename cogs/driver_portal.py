@@ -4,10 +4,6 @@ import logging
 import re
 import os
 import json
-import pytesseract
-from pdf2image import convert_from_bytes
-from PIL import Image
-import io
 from sqlalchemy.future import select
 from google import genai
 
@@ -58,27 +54,21 @@ class DriverPortal(commands.Cog):
         # Find the load associated with this thread
         load_record = await self._find_load_for_thread(str(message.channel.id))
 
-        # Extract text from attachments if present
-        extracted_text = ""
+        # Process attachments
+        file_part = None
         if message.attachments:
             try:
+                from google.genai import types
                 attachment = message.attachments[0]
                 file_bytes = await attachment.read()
                 filename_lower = attachment.filename.lower()
                 
-                is_pdf = False
-                if attachment.content_type and "application/pdf" in attachment.content_type:
-                    is_pdf = True
-                elif filename_lower.endswith('.pdf'):
-                    is_pdf = True
-
-                if is_pdf:
-                    images = convert_from_bytes(file_bytes)
-                    for img in images:
-                        extracted_text += pytesseract.image_to_string(img) + "\n"
-                elif filename_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                    img = Image.open(io.BytesIO(file_bytes))
-                    extracted_text = pytesseract.image_to_string(img)
+                mime_type = "application/pdf"
+                if filename_lower.endswith('.png'): mime_type = "image/png"
+                elif filename_lower.endswith(('.jpg', '.jpeg')): mime_type = "image/jpeg"
+                elif filename_lower.endswith('.webp'): mime_type = "image/webp"
+                
+                file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
             except Exception as e:
                 log.error(f"Error reading attachment in driver thread: {e}")
 
@@ -91,20 +81,23 @@ class DriverPortal(commands.Cog):
 Analyze this message from a truck driver in a dispatch thread for Load {load_id}.
 Determine the driver's intent. Return a JSON object with key 'action'.
 Possible actions:
-- "loaded" — driver says they've picked up the freight
-- "delivered" — driver says they've delivered / sending BOL/POD
+- "loaded" — driver says they've picked up the freight or attached a BOL (Bill of Lading). If an image/document is attached and it looks like a BOL/receipt, assume they are loaded.
+- "delivered" — driver says they've delivered or attached a POD (Proof of Delivery).
 - "temp_response" — driver is responding to a temperature check (extract temp in 'temp_value')
 - "issue" — driver is reporting a problem
 - "unknown" — not a dispatch-related message
 
 Return JSON like: {{"action": "loaded"}} or {{"action": "temp_response", "temp_value": "-2°F"}}
 Driver Message: "{content}"
-Document Text: "{extracted_text[:3000]}"
 """
             try:
+                contents = [prompt]
+                if file_part:
+                    contents.insert(0, file_part)
+                    
                 response = await self.gemini_client.aio.models.generate_content(
                     model=self.model,
-                    contents=prompt
+                    contents=contents
                 )
                 raw_json = response.text.replace("```json", "").replace("```", "").strip()
                 data = json.loads(raw_json)
