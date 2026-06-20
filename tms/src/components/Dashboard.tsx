@@ -338,12 +338,12 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                 <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: 'var(--text-secondary)' }}>Attached Documents</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ background: 'var(--primary-glow)', padding: '8px', borderRadius: '4px', color: 'var(--primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                      <div style={{ background: 'var(--primary-glow)', padding: '8px', borderRadius: '4px', color: 'var(--primary)', flexShrink: 0 }}>
                         <List size={20} />
                       </div>
-                      <div>
-                        <p style={{ fontWeight: '500', fontSize: '14px' }}>Original_Rate_Confirmation.pdf</p>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontWeight: '500', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Original_Rate_Confirmation.pdf</p>
                         <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Uploaded by HAUL-E Bot</p>
                       </div>
                     </div>
@@ -355,18 +355,18 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                           alert("Document not found. This load was created before file storage was enabled.");
                         }
                       }}
-                      className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent' }}>View</button>
+                      className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent', flexShrink: 0, marginLeft: '8px' }}>View</button>
                   </div>
 
                   {/* BOL Document */}
                   {(selectedLoad as any).bol_path && (
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ background: 'rgba(39, 201, 63, 0.1)', padding: '8px', borderRadius: '4px', color: '#27c93f' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        <div style={{ background: 'rgba(39, 201, 63, 0.1)', padding: '8px', borderRadius: '4px', color: '#27c93f', flexShrink: 0 }}>
                           <List size={20} />
                         </div>
-                        <div>
-                          <p style={{ fontWeight: '500', fontSize: '14px' }}>Bill_of_Lading (BOL)</p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: '500', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Bill_of_Lading (BOL)</p>
                           <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Uploaded by Driver</p>
                         </div>
                       </div>
@@ -375,19 +375,19 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                           const url = (selectedLoad as any).bol_path.replace('/home/no_one/Desktop/broker-bot/uploads', `${import.meta.env.VITE_API_URL}/uploads`);
                           window.open(url, '_blank');
                         }}
-                        className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent' }}>View</button>
+                        className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent', flexShrink: 0, marginLeft: '8px' }}>View</button>
                     </div>
                   )}
 
                   {/* POD Document */}
                   {(selectedLoad as any).pod_path && (
                     <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ background: 'rgba(255, 189, 46, 0.1)', padding: '8px', borderRadius: '4px', color: '#ffbd2e' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        <div style={{ background: 'rgba(255, 189, 46, 0.1)', padding: '8px', borderRadius: '4px', color: '#ffbd2e', flexShrink: 0 }}>
                           <List size={20} />
                         </div>
-                        <div>
-                          <p style={{ fontWeight: '500', fontSize: '14px' }}>Proof_of_Delivery (POD)</p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: '500', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Proof_of_Delivery (POD)</p>
                           <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Uploaded by Driver</p>
                         </div>
                       </div>
@@ -396,7 +396,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                           const url = (selectedLoad as any).pod_path.replace('/home/no_one/Desktop/broker-bot/uploads', `${import.meta.env.VITE_API_URL}/uploads`);
                           window.open(url, '_blank');
                         }}
-                        className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent' }}>View</button>
+                        className="icon-button" style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', background: 'transparent', flexShrink: 0, marginLeft: '8px' }}>View</button>
                     </div>
                   )}
                 </div>
