@@ -158,7 +158,9 @@ class LoadConfirmView(discord.ui.View):
                     title=f"📋 Dispatch Details — {self.load_id_val}",
                     color=0x3b82f6
                 )
-                dispatch_embed.add_field(name="📍 Route", value=self.origin_dest, inline=False)
+                origin_str, dest_str = self.origin_dest.split(" → ") if " → " in self.origin_dest else (self.origin_dest, "Unknown")
+                dispatch_embed.add_field(name="📍 Origin", value=origin_str, inline=True)
+                dispatch_embed.add_field(name="🏁 Destination", value=dest_str, inline=True)
                 dispatch_embed.add_field(name="📅 Pickup Date", value=self.pickup_date, inline=True)
                 dispatch_embed.add_field(name="💰 Rate", value=f"${self.rate_val}", inline=True)
                 dispatch_embed.add_field(name="📦 Commodity", value=load_info.get('commodity', 'N/A'), inline=True)
@@ -476,7 +478,8 @@ Extract data directly from the attached document.
                             title=f"✅ Load {load_id_val} Processed",
                             color=0x10b981
                         )
-                        embed.add_field(name="📍 Lane", value=origin_dest, inline=False)
+                        embed.add_field(name="📍 Origin", value=origin_str, inline=True)
+                        embed.add_field(name="🏁 Destination", value=dest_str, inline=True)
                         embed.add_field(name="💰 Rate", value=f"${rate_val}", inline=True)
                         embed.add_field(name="📊 Readiness Score", value=f"{score}/100", inline=True)
                         
