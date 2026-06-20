@@ -194,7 +194,7 @@ class LoadConfirmView(discord.ui.View):
                 trailer_number = "Unknown"
                 
                 if assigned_driver and assigned_driver != "Unassigned":
-                    from database.models import Vehicle, AsyncSessionLocal
+                    from database.models import Vehicle
                     from sqlalchemy.future import select
                     async with AsyncSessionLocal() as session:
                         v_result = await session.execute(select(Vehicle).where(Vehicle.driver == assigned_driver))
@@ -578,8 +578,7 @@ Extract data directly from the attached document.
                         else:
                             risk = "Low"
                         # ----------------------------------------------
-                        
-                        alerts_str = "\n".join([f"⚠️ {a}" for a in alerts]) if alerts else "None"
+                        # ----------------------------------------------
                         
                         embed = discord.Embed(
                             title=f"✅ Load {load_id_val} Processed",
@@ -602,7 +601,20 @@ Extract data directly from the attached document.
                         embed.add_field(name="🧠 Dispatcher Summary", value=summary[:1021] + "..." if len(summary) > 1024 else summary, inline=False)
                         
                         if alerts:
-                            embed.add_field(name="🚨 Actionable Alerts", value=alerts_str[:1021] + "..." if len(alerts_str) > 1024 else alerts_str, inline=False)
+                            chunk = ""
+                            chunk_idx = 1
+                            for a in alerts:
+                                alert_str = f"⚠️ {a}\n"
+                                if len(chunk) + len(alert_str) > 1024:
+                                    name = "🚨 Actionable Alerts" if chunk_idx == 1 else f"🚨 Actionable Alerts (Cont. {chunk_idx})"
+                                    embed.add_field(name=name, value=chunk.strip(), inline=False)
+                                    chunk = alert_str
+                                    chunk_idx += 1
+                                else:
+                                    chunk += alert_str
+                            if chunk:
+                                name = "🚨 Actionable Alerts" if chunk_idx == 1 else f"🚨 Actionable Alerts (Cont. {chunk_idx})"
+                                embed.add_field(name=name, value=chunk.strip(), inline=False)
                             
                         # Query vehicles to pass into the view
                         from database.models import Vehicle, AsyncSessionLocal
