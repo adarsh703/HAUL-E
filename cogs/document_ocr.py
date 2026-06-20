@@ -44,6 +44,36 @@ class DriverReassignView(discord.ui.View):
                 await session.commit()
         await interaction.response.send_message(f"✅ Driver reassigned to **{new_driver}**. The TMS has been updated.", ephemeral=False)
 
+async def score_and_sort_vehicles(vehicles):
+    from services.motive_service import get_vehicle_tracking
+    import asyncio
+    
+    valid_vehicles = [v for v in vehicles if v.driver and v.driver.lower() != 'unassigned']
+    unassigned_vehicles = [v for v in vehicles if not v.driver or v.driver.lower() == 'unassigned']
+    
+    async def score_vehicle(v):
+        score = 100
+        tracking = await asyncio.to_thread(get_vehicle_tracking, v.unit_id)
+        reason = "Based on availability (Motive tracking skipped)."
+        if tracking:
+            hos = tracking.get('hos', 0)
+            if hos < 3:
+                score -= 100
+            score += hos * 5
+            loc = tracking.get('location', 'Unknown')
+            reason = f"Based on ELD proximity ({loc}) and HOS ({hos} hrs)."
+        else:
+            score -= 50
+        return (score, v, reason)
+
+    scored_vehicles = await asyncio.gather(*(score_vehicle(v) for v in valid_vehicles))
+    scored_vehicles = list(scored_vehicles)
+    scored_vehicles.sort(key=lambda x: x[0], reverse=True)
+    
+    sorted_vehicles = [sv[1] for sv in scored_vehicles] + unassigned_vehicles
+    reasons = {sv[1].unit_id: sv[2] for sv in scored_vehicles}
+    return sorted_vehicles, reasons
+
 class LoadConfirmView(discord.ui.View):
     DRIVERS_CHANNEL_ID = 1517447020791468122
 
@@ -558,12 +588,13 @@ Extract data directly from the attached document.
                             v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
                             active_vehicles = v_result.scalars().all()
                             
-                        # Sort so that named drivers are at the top, Unassigned at the bottom
-                        active_vehicles.sort(key=lambda x: (x.driver == 'Unassigned', x.driver))
+                        # Score and sort using Motive API
+                        active_vehicles, driver_reasons = await score_and_sort_vehicles(active_vehicles)
 
                         if active_vehicles:
                             best_vehicle = active_vehicles[0]
-                            embed.add_field(name="🤖 Predicted Driver", value=f"**{best_vehicle.driver}** (Select below to change)", inline=False)
+                            reason_str = driver_reasons.get(best_vehicle.unit_id, "Based on availability.")
+                            embed.add_field(name="🤖 Predicted Driver", value=f"**{best_vehicle.driver}** (Select below to change)\n> *{reason_str}*", inline=False)
                         else:
                             embed.add_field(name="🤖 Predicted Driver", value="**Unassigned** (No active trucks)", inline=False)
                             
