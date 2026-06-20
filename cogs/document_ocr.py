@@ -159,7 +159,7 @@ class LoadConfirmView(discord.ui.View):
                         stop_text += f"\n📝 {instructions}"
                     dispatch_embed.add_field(name=f"{'📦' if 'Pickup' in stop_type else '📬'} Stop {i+1}: {stop_type}", value=stop_text, inline=False)
 
-                dispatch_embed.set_footer(text="Reply LOADED when freight is on the truck. Upload BOL/POD when delivered.")
+                dispatch_embed.set_footer(text="Reply LOADED and attach BOL at pickup. Reply DELIVERED and attach POD at destination.")
                 await thread.send(embed=dispatch_embed)
                 
                 # --- AUTO DISPATCH LOGIC ---
