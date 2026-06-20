@@ -127,31 +127,45 @@ Document Text: "{extracted_text[:3000]}"
                     await message.add_reaction("✅")
                     await message.reply(f"🚚 **Load Status Updated**\nLoad {load_id} is now **In Transit**.")
 
+                    if message.attachments:
+                        await message.reply("📄 BOL received. Saved to file.")
+                        try:
+                            bol_attachment = message.attachments[0]
+                            os.makedirs("bols", exist_ok=True)
+                            bol_path = f"bols/BOL_{load_id}_{bol_attachment.filename}"
+                            await bol_attachment.save(bol_path)
+                            load.bol_path = bol_path
+                            await session.commit()
+                        except Exception as e:
+                            log.error(f"Failed to save BOL: {e}")
+
                 elif action == "delivered":
                     load.status = 'Delivered'
                     await session.commit()
                     await message.add_reaction("✅")
                     await message.reply(f"🚚 **Load Status Updated**\nLoad {load_id} is now **Delivered**.")
 
-                    # If there's an attachment (BOL/POD), save and invoice
                     if message.attachments:
-                        await message.reply("📄 BOL/POD received. Generating invoice and emailing...")
+                        await message.reply("📄 POD received. Generating invoice and emailing...")
                         
                         try:
-                            # Save BOL locally
-                            bol_attachment = message.attachments[0]
+                            # Save POD locally
+                            pod_attachment = message.attachments[0]
                             os.makedirs("bols", exist_ok=True)
-                            bol_path = f"bols/{bol_attachment.filename}"
-                            await bol_attachment.save(bol_path)
+                            pod_path = f"bols/POD_{load_id}_{pod_attachment.filename}"
+                            await pod_attachment.save(pod_path)
 
-                            # Update load record with BOL path
-                            load.bol_path = bol_path
+                            # Update load record with POD path
+                            load.pod_path = pod_path
                             await session.commit()
                             
+                            # Use existing BOL if uploaded at pickup, else use POD as BOL for invoice
+                            final_bol = load.bol_path if load.bol_path else pod_path
+
                             # Generate Invoice
                             pdf_path = generate_invoice(
                                 load_id=load.load_id,
-                                broker_name=load.broker or "Broker",
+                                broker_name=load.broker_email or "Broker",
                                 origin_dest=load.origin_dest,
                                 rate=load.rate,
                                 date=load.pickup_date
@@ -162,9 +176,8 @@ Document Text: "{extracted_text[:3000]}"
                                 to=NOTIFY_EMAIL,
                                 load_id=load.load_id,
                                 pdf_path=pdf_path,
-                                bol_path=bol_path
+                                bol_path=final_bol
                             )
-                            
                             await message.reply(f"💸 **Invoice generated and sent to {NOTIFY_EMAIL}!**")
                         except Exception as e:
                             log.error(f"Failed to auto-invoice: {e}", exc_info=True)
