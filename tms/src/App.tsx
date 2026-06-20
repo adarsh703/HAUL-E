@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import Dispatch from './components/Dispatch';
 import Fleet from './components/Fleet';
 import ProfitPredictor from './components/ProfitPredictor';
+import Drivers from './components/Drivers';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -28,6 +29,9 @@ function App() {
           </a>
           <a href="#" className={`nav-item ${activeTab === 'dispatch' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('dispatch'); }}>
             <MapPin size={20} /> <span>Dispatch Map</span>
+          </a>
+          <a href="#" className={`nav-item ${activeTab === 'drivers' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('drivers'); }}>
+            <Truck size={20} /> <span>Drivers</span>
           </a>
           <a href="#" className={`nav-item ${activeTab === 'fleet' ? 'active' : ''}`} onClick={(e) => { e.preventDefault(); setActiveTab('fleet'); }}>
             <Truck size={20} /> <span>Fleet Management</span>
@@ -73,6 +77,7 @@ function App() {
           <>
             {activeTab === 'dashboard' && <Dashboard onNavigate={setActiveTab} />}
             {activeTab === 'dispatch' && <Dispatch />}
+            {activeTab === 'drivers' && <Drivers />}
             {activeTab === 'fleet' && <Fleet />}
             {activeTab === 'profits' && <ProfitPredictor />}
           </>
