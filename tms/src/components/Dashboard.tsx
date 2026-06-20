@@ -210,7 +210,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                     {getStateCode(load)}
                   </div>
                   <div className="item-info" style={{ minWidth: 0, overflow: 'hidden' }}>
-                    <h4 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatRoute(load)}</h4>
+                    <h4 style={{ wordBreak: 'break-word', lineHeight: '1.2' }}>{formatRoute(load)}</h4>
                     <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Driver: {load.driver} • {load.load_id}</p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ background: 'var(--bg-base)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Route</p>
-                  <p style={{ fontWeight: '600', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', alignItems: 'flex-start', gap: '8px', lineHeight: '1.3' }}>
+                  <p style={{ fontWeight: '600', wordBreak: 'break-word', alignItems: 'flex-start', gap: '8px', lineHeight: '1.3' }}>
                     <MapPin size={16} className="text-primary" style={{ display: 'inline', marginRight: '4px', position: 'relative', top: '2px' }} /> 
                     {formatRoute(selectedLoad)}
                   </p>
