@@ -129,8 +129,18 @@ Driver Message: "{content}"
                             await bol_attachment.save(bol_path)
                             load.bol_path = bol_path
                             await session.commit()
+                            
+                            # Send email to broker
+                            from gmail_sender import send_bol_email
+                            if load.broker_email:
+                                asyncio.create_task(send_bol_email(load.broker_email, load_id, bol_path))
+                                log.info(f"Emailed BOL to {load.broker_email}")
+                            elif load.shipper_email:
+                                asyncio.create_task(send_bol_email(load.shipper_email, load_id, bol_path))
+                                log.info(f"Emailed BOL to {load.shipper_email}")
+                                
                         except Exception as e:
-                            log.error(f"Failed to save BOL: {e}")
+                            log.error(f"Failed to save and email BOL: {e}")
 
                     # Automatically start Temp Checks if it's a reefer load
                     try:

@@ -175,6 +175,45 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
         server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
 
 async def send_invoice_email(to: str, load_id: str, pdf_path: str, bol_path: str = None) -> None:
-    subject = f"Invoice & BOL for Load {load_id} | {COMPANY_NAME}"
-    body = f"Hello,\n\nPlease find attached the Invoice and Proof of Delivery (BOL) for Load {load_id}.\nLet us know if you need any further information.\n\nThank you,\n{COMPANY_NAME}"
+    subject = f"Invoice & POD — Load {load_id} — {COMPANY_NAME}"
+    body = f"Hello,\n\nPlease find attached the Invoice and Proof of Delivery for Load {load_id}.\n\nThank you,\n{COMPANY_NAME}"
     await asyncio.to_thread(_send_invoice_via_smtp, to, subject, body, pdf_path, bol_path)
+
+def _send_bol_via_smtp(to: str, subject: str, plain_body: str, bol_path: str) -> None:
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        raise EnvironmentError("GMAIL_USER or GMAIL_APP_PASSWORD is missing from .env.")
+
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
+    msg["To"] = to
+    msg["Cc"] = GMAIL_USER
+    msg["Reply-To"] = GMAIL_USER
+
+    text_part = MIMEMultipart("alternative")
+    text_part.attach(MIMEText(plain_body, "plain"))
+    msg.attach(text_part)
+
+    if os.path.exists(bol_path):
+        with open(bol_path, "rb") as f:
+            if bol_path.lower().endswith('.pdf'):
+                bol_attachment = MIMEApplication(f.read(), _subtype="pdf")
+            else:
+                bol_attachment = MIMEImage(f.read())
+            bol_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(bol_path))
+            msg.attach(bol_attachment)
+
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+    except Exception as e:
+        log.error("Failed to send BOL via SMTP: %s", e)
+        raise
+
+async def send_bol_email(to: str, load_id: str, bol_path: str) -> None:
+    subject = f"Bill of Lading (Loaded) — Load {load_id} — {COMPANY_NAME}"
+    body = f"Hello,\n\nOur driver has successfully picked up Load {load_id}. Please find the attached Bill of Lading (BOL).\n\nThank you,\n{COMPANY_NAME}"
+    await asyncio.to_thread(_send_bol_via_smtp, to, subject, body, bol_path)
