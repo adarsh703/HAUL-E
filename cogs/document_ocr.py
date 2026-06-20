@@ -72,7 +72,7 @@ class LoadConfirmView(discord.ui.View):
             for v in active_vehicles:
                 label = f"{v.driver} (Truck {v.unit_id})"
                 desc = "Recommended Auto-Assign" if v == best_vehicle else None
-                options.append(discord.SelectOption(label=label, value=v.driver, description=desc))
+                options.append(discord.SelectOption(label=label, value=str(v.unit_id), description=desc))
 
             self.driver_select = discord.ui.Select(
                 placeholder=f"Auto-assigning to {best_vehicle.driver}...",
@@ -85,9 +85,10 @@ class LoadConfirmView(discord.ui.View):
             self.add_item(self.driver_select)
 
     async def driver_callback(self, interaction: discord.Interaction):
-        self.selected_driver = self.driver_select.values[0]
+        selected_unit_id = self.driver_select.values[0]
         for v in self.active_vehicles:
-            if v.driver == self.selected_driver:
+            if str(v.unit_id) == selected_unit_id:
+                self.selected_driver = v.driver
                 self.selected_phone = getattr(v, 'phone', None)
                 break
         await interaction.response.defer()
@@ -187,7 +188,7 @@ class LoadConfirmView(discord.ui.View):
                 alerts = ops_intel.get('alerts', [])
                 if alerts:
                     alerts_str = "\n".join([f"• {a}" for a in alerts])
-                    dispatch_embed.add_field(name="🚨 Alerts & Requirements", value=alerts_str, inline=False)
+                    dispatch_embed.add_field(name="🚨 Alerts & Requirements", value=alerts_str[:1021] + "..." if len(alerts_str) > 1024 else alerts_str, inline=False)
 
                 dispatch_embed.set_footer(text="Reply LOADED and attach BOL at pickup. Reply DELIVERED and attach POD at destination.")
                 await thread.send(embed=dispatch_embed)
@@ -493,10 +494,10 @@ Extract data directly from the attached document.
                         risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
                         embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
                         
-                        embed.add_field(name="🧠 Dispatcher Summary", value=summary, inline=False)
+                        embed.add_field(name="🧠 Dispatcher Summary", value=summary[:1021] + "..." if len(summary) > 1024 else summary, inline=False)
                         
                         if alerts:
-                            embed.add_field(name="🚨 Actionable Alerts", value=alerts_str, inline=False)
+                            embed.add_field(name="🚨 Actionable Alerts", value=alerts_str[:1021] + "..." if len(alerts_str) > 1024 else alerts_str, inline=False)
                             
                         # Query vehicles to pass into the view
                         from database.models import Vehicle, AsyncSessionLocal
