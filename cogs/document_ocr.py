@@ -66,7 +66,7 @@ class LoadConfirmView(discord.ui.View):
         if active_vehicles:
             best_vehicle = active_vehicles[0]
             self.selected_driver = best_vehicle.driver
-            self.selected_phone = best_vehicle.phone
+            self.selected_phone = getattr(best_vehicle, 'phone', None)
 
             options = []
             for v in active_vehicles:
@@ -88,7 +88,7 @@ class LoadConfirmView(discord.ui.View):
         self.selected_driver = self.driver_select.values[0]
         for v in self.active_vehicles:
             if v.driver == self.selected_driver:
-                self.selected_phone = v.phone
+                self.selected_phone = getattr(v, 'phone', None)
                 break
         await interaction.response.defer()
 
@@ -242,7 +242,7 @@ class LoadConfirmView(discord.ui.View):
                     
                     if is_reefer and vehicles:
                         # Assuming best_vehicle was chosen
-                        start_temp_checks(self.load_id_val, best_vehicle.phone, interval_hours=3)
+                        start_temp_checks(self.load_id_val, getattr(best_vehicle, 'phone', None), interval_hours=3)
                         
                     # 2. Start initial ETA/Location update right now for demonstration
                     shipper_email = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
