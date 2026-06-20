@@ -143,7 +143,13 @@ Document Text: "{extracted_text[:3000]}"
                     load.status = 'Delivered'
                     await session.commit()
                     await message.add_reaction("✅")
-                    await message.reply(f"🚚 **Load Status Updated**\nLoad {load_id} is now **Delivered**.")
+                    try:
+                        from services.temp_checker import stop_temp_checks
+                        stop_temp_checks(load_id)
+                    except Exception as e:
+                        log.error(f"Failed to stop temp checks for load {load_id}: {e}")
+                    # In a real app we might parse attached PODs here
+                    await message.reply(f"🚚 **Load Status Updated**\nLoad {load_id} is now **Delivered**. Temp checks disabled.")
 
                     if message.attachments:
                         await message.reply("📄 POD received. Generating invoice and emailing...")

@@ -156,6 +156,14 @@ async def delete_load(load_id: str):
             raise HTTPException(status_code=404, detail="Load not found")
         await session.delete(load_item)
         await session.commit()
+        
+        # Stop any active temp check loops for this load
+        try:
+            from services.temp_checker import stop_temp_checks
+            stop_temp_checks(load_id)
+        except Exception as e:
+            log.error(f"Error stopping temp checks for deleted load {load_id}: {e}")
+            
         return {"status": "success", "message": f"Load {load_id} deleted"}
 
 @app.post("/api/dispatch/auto")
