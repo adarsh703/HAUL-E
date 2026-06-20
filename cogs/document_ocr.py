@@ -202,39 +202,41 @@ class LoadConfirmView(discord.ui.View):
                 await thread.send(embed=dispatch_embed)
                 
                 # --- AUTO DISPATCH LOGIC ---
-                try:
-                    from database.models import Vehicle
-                    from services.motive_service import get_vehicle_tracking
-                    import asyncio
-                    
-                    async with AsyncSessionLocal() as session:
-                        v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
-                        vehicles = v_result.scalars().all()
+                if self.selected_driver == 'Unassigned':
+                    try:
+                        from database.models import Vehicle
+                        from services.motive_service import get_vehicle_tracking
+                        import asyncio
                         
-                    if vehicles:
-                        best_vehicle = random.choice(vehicles)
-                        assigned_driver = best_vehicle.driver
-                        
-                        tracking = await asyncio.to_thread(get_vehicle_tracking, best_vehicle.unit_id)
-                        if tracking:
-                            hos = tracking.get('hos', 8.5)
-                            loc = tracking.get('location', 'Unknown')
-                            auto_reason = f"Based on ELD Proximity ({loc}) and HOS ({hos} hrs remaining)."
-                        else:
-                            auto_reason = "Based on Equipment match and availability."
-                            
                         async with AsyncSessionLocal() as session:
-                            l_result = await session.execute(select(Load).where(Load.load_id == self.load_id_val))
-                            load_db = l_result.scalars().first()
-                            if load_db:
-                                load_db.driver = assigned_driver
-                                load_db.status = "Dispatched"
-                                await session.commit()
+                            v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
+                            vehicles = v_result.scalars().all()
+                            
+                        if vehicles:
+                            best_vehicle = random.choice(vehicles)
+                            assigned_driver = best_vehicle.driver
+                            
+                            tracking = await asyncio.to_thread(get_vehicle_tracking, best_vehicle.unit_id)
+                            if tracking:
+                                hos = tracking.get('hos', 8.5)
+                                loc = tracking.get('location', 'Unknown')
+                                auto_reason = f"Based on ELD Proximity ({loc}) and HOS ({hos} hrs remaining)."
+                            else:
+                                auto_reason = "Based on Equipment match and availability."
                                 
-                        reassign_view = DriverReassignView(self.load_id_val, assigned_driver, vehicles)
-                        await thread.send(f"🤖 **Auto-Assigned:** {assigned_driver}\n**Reason:** {auto_reason}", view=reassign_view)
-                except Exception as auto_e:
-                    log.error(f"Auto-dispatch failed: {auto_e}")
+                            async with AsyncSessionLocal() as session:
+                                l_result = await session.execute(select(Load).where(Load.load_id == self.load_id_val))
+                                load_db = l_result.scalars().first()
+                                if load_db:
+                                    load_db.driver = assigned_driver
+                                    load_db.status = "Assigned"
+                                    self.selected_driver = assigned_driver # Update state
+                                    await session.commit()
+                                    
+                            reassign_view = DriverReassignView(self.load_id_val, assigned_driver, vehicles)
+                            await thread.send(f"🤖 **Auto-Assigned:** {assigned_driver}\n**Reason:** {auto_reason}", view=reassign_view)
+                    except Exception as auto_e:
+                        log.error(f"Auto-dispatch failed: {auto_e}")
                     
                 # --- AUTOMATED TRACKING & TEMP CHECKS ---
                 try:
