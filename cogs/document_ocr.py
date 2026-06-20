@@ -203,11 +203,8 @@ class LoadConfirmView(discord.ui.View):
                             truck_number = vehicle.unit_id
 
                 message_lines = [
-                    f"**Hello Driver, your dispatch is:**",
-                    f"#{self.load_id_val} Dispatch",
-                    f"Truck: {truck_number}",
-                    f"Trailer: {trailer_number}",
-                    f"Driver: {driver_name.upper()}",
+                    f"🚚 **NEW DISPATCH: Load #{self.load_id_val}**",
+                    f"**Driver:** {driver_name.upper()}  |  **Truck:** {truck_number}",
                     ""
                 ]
                 
@@ -227,25 +224,36 @@ class LoadConfirmView(discord.ui.View):
                     refs = stop.get('reference_numbers', [])
                     ref_str = ", ".join(refs) if refs else "N/A"
                     
-                    message_lines.append(f"{i+1}. {stop_type} info:")
-                    message_lines.append(f"Name: {company}")
-                    message_lines.append(f"Address: {address_full}")
-                    message_lines.append(f"Phone: {phone}")
-                    message_lines.append(f"Number: {ref_str}")
-                    message_lines.append(f"Appointment Date: {appt}")
-                    message_lines.append(f"Stop Type: {stop_type}")
-                    message_lines.append(f"Note: {instructions}")
+                    emoji = "📍" if "Pick" in stop_type else "🏁"
+                    num_label = "PU Number" if "Pick" in stop_type else "DO Number"
+                    
+                    message_lines.append(f"{emoji} **STOP {i+1}: {stop_type.upper()}**")
+                    message_lines.append(f"**Name:** {company}")
+                    message_lines.append(f"**Address:** {address_full}")
+                    message_lines.append(f"**Phone:** {phone}")
+                    message_lines.append(f"**{num_label}:** {ref_str}")
+                    message_lines.append(f"**Appt:** {appt}")
+                    if instructions and instructions.lower() != 'none':
+                        message_lines.append(f"*Note: {instructions}*")
                     message_lines.append("")
                     
                 ops_intel = self.load_data.get('operational_intelligence', {})
                 alerts = ops_intel.get('alerts', [])
+                
+                # Check for temperature requirements to add as alert
+                load_info = self.load_data.get('load_information', {})
+                reefer = self.load_data.get('reefer_operations', {})
+                temp = reefer.get('temperature_setpoint') or load_info.get('temperature_requirements')
+                if temp and temp.lower() != 'n/a':
+                    alerts.insert(0, f"Temperature Setpoint: {temp}")
+                    
                 if alerts:
-                    message_lines.append("EXTRA IMPORTANT DETAILS:")
+                    message_lines.append("⚠️ **EXTRA REQUIREMENTS:**")
                     for alert in alerts:
-                        message_lines.append(f"- {alert}")
+                        message_lines.append(f"• {alert}")
                     message_lines.append("")
                 
-                message_lines.append("Reply OK if received")
+                message_lines.append("👉 **Reply `OK` to confirm receipt!**")
                 
                 dispatch_text = "\n".join(message_lines)
                 await thread.send(dispatch_text)
