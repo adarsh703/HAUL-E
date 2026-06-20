@@ -557,9 +557,13 @@ Extract data directly from the attached document.
                         async with AsyncSessionLocal() as session:
                             v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
                             active_vehicles = v_result.scalars().all()
+                            
+                        # Sort so that named drivers are at the top, Unassigned at the bottom
+                        active_vehicles.sort(key=lambda x: (x.driver == 'Unassigned', x.driver))
 
                         if active_vehicles:
-                            embed.add_field(name="🤖 Predicted Driver", value=f"**{active_vehicles[0].driver}** (Select below to change)", inline=False)
+                            best_vehicle = active_vehicles[0]
+                            embed.add_field(name="🤖 Predicted Driver", value=f"**{best_vehicle.driver}** (Select below to change)", inline=False)
                         else:
                             embed.add_field(name="🤖 Predicted Driver", value="**Unassigned** (No active trucks)", inline=False)
                             
