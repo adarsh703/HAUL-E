@@ -263,7 +263,7 @@ class LoadConfirmView(discord.ui.View):
         embed.set_footer(text="Load saved to Database & Google Sheets")
         await interaction.edit_original_response(embed=embed, view=None)
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, custom_id="btn_cancel_load")
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, custom_id="btn_cancel_load", row=1)
     async def cancel_load_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = interaction.message.embeds[0]
         embed.title = f"❌ Load {self.load_id_val} Creation Cancelled"
