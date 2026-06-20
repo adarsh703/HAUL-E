@@ -361,7 +361,7 @@ Ensure the JSON has the EXACT following structure, filling in values where found
 CRITICAL RULES:
 - For `stops[].city_state`, ONLY output the City and State (e.g., "Laredo, TX"). Do not include the street address or zip code here.
 - For `workflow_state`, ONLY use one of the following exact words: "Pending", "In Transit", "Delivered", or "Cancelled".
-- For `operational_intelligence.alerts`, you MUST EXHAUSTIVELY LIST every single penalty, fine, temperature requirement (like pre-cooling or continuous mode), equipment requirement (like load locks or air chutes), and strict appointment rule found in the document. Do not summarize them away; list each one as a separate alert.
+- For `operational_intelligence.alerts`, extract a comprehensive list of all penalties, fines, temperature rules, and equipment requirements. BUT you must synthesize them into clear, concise, actionable points. If a rule refers to a "listed temperature", resolve it and state the actual temperature (e.g. "Maintain continuous reefer operation at 35F"). Do not just copy/paste raw text; make it highly readable for a driver.
 
 User Message:
 {user_text}
