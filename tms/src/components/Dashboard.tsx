@@ -202,7 +202,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
           ) : (
             recentLoads.map(load => (
               <div className="list-item" key={load.id} onClick={() => setSelectedLoad(load)} style={{ cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'var(--bg-surface-hover)'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
-                <div className="item-left">
+                <div className="item-left" style={{ flex: 1, minWidth: 0, paddingRight: '16px' }}>
                   <div className="item-avatar" style={{
                     background: load.status === 'Delivered' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)',
                     color: load.status === 'Delivered' ? 'var(--accent)' : 'var(--primary)'
@@ -210,7 +210,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                     {getStateCode(load)}
                   </div>
                   <div className="item-info" style={{ minWidth: 0, overflow: 'hidden' }}>
-                    <h4 style={{ wordBreak: 'break-word', lineHeight: '1.2' }}>{formatRoute(load)}</h4>
+                    <h4 style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.2' }}>{formatRoute(load)}</h4>
                     <p style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Driver: {load.driver} • {load.load_id}</p>
                   </div>
                 </div>

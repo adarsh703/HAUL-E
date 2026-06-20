@@ -399,6 +399,8 @@ textarea::placeholder {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .status-badge.in-transit {
