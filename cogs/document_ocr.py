@@ -212,17 +212,37 @@ class LoadConfirmView(discord.ui.View):
                             v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
                             vehicles = v_result.scalars().all()
                             
-                        if vehicles:
-                            best_vehicle = random.choice(vehicles)
-                            assigned_driver = best_vehicle.driver
+                        valid_vehicles = [v for v in vehicles if v.driver and v.driver.lower() != 'unassigned']
+                        
+                        best_vehicle = None
+                        best_score = -1
+                        auto_reason = ""
+                        
+                        for v in valid_vehicles:
+                            score = 100
+                            # Real Motive API check
+                            tracking = await asyncio.to_thread(get_vehicle_tracking, v.unit_id)
                             
-                            tracking = await asyncio.to_thread(get_vehicle_tracking, best_vehicle.unit_id)
                             if tracking:
-                                hos = tracking.get('hos', 8.5)
-                                loc = tracking.get('location', 'Unknown')
-                                auto_reason = f"Based on ELD Proximity ({loc}) and HOS ({hos} hrs remaining)."
+                                hos = tracking.get('hos', 0)
+                                if hos < 3:
+                                    continue # Skip drivers with low HOS
+                                score += hos * 5 # Prioritize drivers with more HOS
                             else:
-                                auto_reason = "Based on Equipment match and availability."
+                                score -= 50 # Penalize if no tracking available
+                                
+                            if score > best_score:
+                                best_score = score
+                                best_vehicle = v
+                                if tracking:
+                                    loc = tracking.get('location', 'Unknown')
+                                    hos = tracking.get('hos', 8.5)
+                                    auto_reason = f"Based on ELD tracking ({loc}) and HOS ({hos} hrs)."
+                                else:
+                                    auto_reason = "Based on driver availability (Motive API unavailable)."
+                                    
+                        if best_vehicle:
+                            assigned_driver = best_vehicle.driver
                                 
                             async with AsyncSessionLocal() as session:
                                 l_result = await session.execute(select(Load).where(Load.load_id == self.load_id_val))
