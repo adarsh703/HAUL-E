@@ -147,9 +147,7 @@ Document Text: "{extracted_text[:3000]}"
                         # We can check if it's a reefer load by looking at ops intel
                         # For now, start it if the temp_check flag is not active
                         if not load.temp_check_active:
-                            # We can pass interval_hours=3 
-                            # (We'd ideally parse the setpoint, but tracking will check it anyway)
-                            asyncio.create_task(start_temp_checks(load.load_id, getattr(load, 'driver_phone', None), interval_hours=3))
+                            asyncio.create_task(start_temp_checks(load.load_id, getattr(load, 'driver_phone', None), interval_minutes=180))
                             load.temp_check_active = True
                             await session.commit()
                             log.info(f"Started temp checks for {load.load_id} after BOL receipt.")
