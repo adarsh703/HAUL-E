@@ -208,6 +208,12 @@ class LoadConfirmView(discord.ui.View):
                 temp = reefer.get('temperature_setpoint') or load_info.get('temperature_requirements', 'N/A')
                 dispatch_embed.add_field(name="🌡️ Temperature", value=temp, inline=True)
 
+                broker_contact = []
+                if load_info.get('broker_email'): broker_contact.append(f"📧 {load_info['broker_email']}")
+                if load_info.get('broker_phone'): broker_contact.append(f"📞 {load_info['broker_phone']}")
+                if broker_contact:
+                    dispatch_embed.add_field(name="👔 Broker Contact", value="\n".join(broker_contact), inline=False)
+
                 # Add stop details
                 for i, stop in enumerate(stops):
                     stop_type = stop.get('stop_type', 'Stop')
@@ -366,7 +372,9 @@ Ensure the JSON has the EXACT following structure, filling in values where found
     "commodity": "",
     "weight": "",
     "miles": "",
-    "temperature_requirements": ""
+    "temperature_requirements": "",
+    "broker_phone": "",
+    "broker_email": ""
   }},
   "stops": [
     {{
@@ -563,6 +571,12 @@ Extract data directly from the attached document.
                         
                         risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
                         embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
+                        
+                        broker_contact = []
+                        if load_info.get('broker_email'): broker_contact.append(f"📧 {load_info['broker_email']}")
+                        if load_info.get('broker_phone'): broker_contact.append(f"📞 {load_info['broker_phone']}")
+                        if broker_contact:
+                            embed.add_field(name="👔 Broker Contact", value="\n".join(broker_contact), inline=False)
                         
                         embed.add_field(name="🧠 Dispatcher Summary", value=summary[:1021] + "..." if len(summary) > 1024 else summary, inline=False)
                         
