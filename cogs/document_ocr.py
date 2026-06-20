@@ -183,6 +183,12 @@ class LoadConfirmView(discord.ui.View):
                         stop_text += f"\n> 📝 *{instructions}*"
                     dispatch_embed.add_field(name=f"{'📦' if 'Pickup' in stop_type else '📬'} Stop {i+1}: {stop_type}", value=stop_text, inline=False)
 
+                ops_intel = self.load_data.get('operational_intelligence', {})
+                alerts = ops_intel.get('alerts', [])
+                if alerts:
+                    alerts_str = "\n".join([f"• {a}" for a in alerts])
+                    dispatch_embed.add_field(name="🚨 Alerts & Requirements", value=alerts_str, inline=False)
+
                 dispatch_embed.set_footer(text="Reply LOADED and attach BOL at pickup. Reply DELIVERED and attach POD at destination.")
                 await thread.send(embed=dispatch_embed)
                 
