@@ -47,7 +47,7 @@ class DriverReassignView(discord.ui.View):
 class LoadConfirmView(discord.ui.View):
     DRIVERS_CHANNEL_ID = 1517447020791468122
 
-    def __init__(self, bot, load_data, document_url, load_id_val, origin_dest, pickup_date, rate_val, ops_intel, broker, original_message):
+    def __init__(self, bot, load_data, document_url, load_id_val, origin_dest, pickup_date, rate_val, ops_intel, broker, original_message, active_vehicles):
         super().__init__(timeout=None)
         self.bot = bot
         self.load_data = load_data
@@ -59,29 +59,49 @@ class LoadConfirmView(discord.ui.View):
         self.ops_intel = ops_intel
         self.broker = broker
         self.original_message = original_message
+        self.active_vehicles = active_vehicles
+        self.selected_driver = "Unassigned"
+        self.selected_phone = None
 
-    @discord.ui.button(label="Create Load", style=discord.ButtonStyle.success, custom_id="btn_create_load")
+        if active_vehicles:
+            best_vehicle = active_vehicles[0]
+            self.selected_driver = best_vehicle.driver
+            self.selected_phone = best_vehicle.phone
+
+            options = []
+            for v in active_vehicles:
+                label = f"{v.driver} (Truck {v.unit_id})"
+                desc = "Recommended Auto-Assign" if v == best_vehicle else None
+                options.append(discord.SelectOption(label=label, value=v.driver, description=desc))
+
+            self.driver_select = discord.ui.Select(
+                placeholder=f"Auto-assigning to {best_vehicle.driver}...",
+                options=options,
+                min_values=1,
+                max_values=1,
+                row=0
+            )
+            self.driver_select.callback = self.driver_callback
+            self.add_item(self.driver_select)
+
+    async def driver_callback(self, interaction: discord.Interaction):
+        self.selected_driver = self.driver_select.values[0]
+        for v in self.active_vehicles:
+            if v.driver == self.selected_driver:
+                self.selected_phone = v.phone
+                break
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Create Load", style=discord.ButtonStyle.success, custom_id="btn_create_load", row=1)
     async def create_load_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
 
         # 1. Save to DB with Auto-Assign
         async with AsyncSessionLocal() as session:
-            from database.models import Vehicle
-            from sqlalchemy.future import select
-            v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
-            active_vehicles = v_result.scalars().all()
+            assigned_driver = self.selected_driver
+            assigned_phone = self.selected_phone
+            assigned_status = 'Dispatched' if self.selected_driver != 'Unassigned' else self.ops_intel.get('workflow_state', 'Pending')
             
-            assigned_driver = 'Unassigned'
-            assigned_status = self.ops_intel.get('workflow_state', 'Pending')
-            assigned_phone = None
-            
-            if active_vehicles:
-                # Auto-Assign to first available truck
-                best_truck = active_vehicles[0]
-                assigned_driver = best_truck.driver
-                assigned_phone = best_truck.phone
-                assigned_status = 'Dispatched'
-                
             new_load = Load(
                 load_id=self.load_id_val,
                 origin_dest=self.origin_dest,
@@ -156,7 +176,9 @@ class LoadConfirmView(discord.ui.View):
                     instructions = stop.get('instructions', '')
                     stop_text = f"**{company}**\n{address}\n📅 {appt}"
                     if instructions:
-                        stop_text += f"\n📝 {instructions}"
+                        if len(instructions) > 200:
+                            instructions = instructions[:197] + "..."
+                        stop_text += f"\n> 📝 *{instructions}*"
                     dispatch_embed.add_field(name=f"{'📦' if 'Pickup' in stop_type else '📬'} Stop {i+1}: {stop_type}", value=stop_text, inline=False)
 
                 dispatch_embed.set_footer(text="Reply LOADED and attach BOL at pickup. Reply DELIVERED and attach POD at destination.")
@@ -466,6 +488,18 @@ Extract data directly from the attached document.
                         if alerts:
                             embed.add_field(name="🚨 Actionable Alerts", value=alerts_str, inline=False)
                             
+                        # Query vehicles to pass into the view
+                        from database.models import Vehicle, AsyncSessionLocal
+                        from sqlalchemy.future import select
+                        async with AsyncSessionLocal() as session:
+                            v_result = await session.execute(select(Vehicle).where(Vehicle.status == 'Active'))
+                            active_vehicles = v_result.scalars().all()
+
+                        if active_vehicles:
+                            embed.add_field(name="🤖 Predicted Driver", value=f"**{active_vehicles[0].driver}** (Select below to change)", inline=False)
+                        else:
+                            embed.add_field(name="🤖 Predicted Driver", value="**Unassigned** (No active trucks)", inline=False)
+                            
                         embed.set_footer(text="Awaiting Confirmation")
                         
                         view = LoadConfirmView(
@@ -478,7 +512,8 @@ Extract data directly from the attached document.
                             rate_val=rate_val,
                             ops_intel=ops_intel,
                             broker=broker,
-                            original_message=message
+                            original_message=message,
+                            active_vehicles=active_vehicles
                         )
 
                         confirmation_channel = self.bot.get_channel(1512055979259334730)
