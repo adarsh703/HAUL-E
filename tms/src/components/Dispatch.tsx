@@ -20,7 +20,7 @@ export default function Dispatch() {
   const [showModal, setShowModal] = useState(false);
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
   const [toast, setToast] = useState('');
-  const [newLoad, setNewLoad] = useState({ load_id: '', origin_dest: '', pickup_date: '', driver: '', rate: '', status: 'Pending' });
+  const [newLoad, setNewLoad] = useState({ load_id: '', origin_dest: '', pickup_date: '', driver: '', rate: '', status: 'Unassigned' });
   const [showSettings, setShowSettings] = useState(false);
   const [settingsData, setSettingsData] = useState({ gmail_user: '', gmail_app_password: '' });
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -101,7 +101,7 @@ export default function Dispatch() {
     }).then(res => res.json()).then(() => {
       setShowModal(false);
       fetchLoads();
-      setNewLoad({ load_id: '', origin_dest: '', pickup_date: '', driver: '', rate: '', status: 'Pending' });
+      setNewLoad({ load_id: '', origin_dest: '', pickup_date: '', driver: '', rate: '', status: 'Unassigned' });
     });
   };
 
@@ -243,7 +243,7 @@ export default function Dispatch() {
                         </div>
                       </td>
                       <td style={{ padding: '16px 24px', maxWidth: '150px' }}>
-                        <span className={`status-badge ${load.status === 'Pending' ? 'pending' : 'in-transit'}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>
+                        <span className={`status-badge ${['Delivered', 'Invoiced'].includes(load.status) ? 'delivered' : load.status === 'In Transit' ? 'in-transit' : load.status === 'Assigned' ? 'assigned' : 'unassigned'}`} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block', maxWidth: '100%' }}>
                           {load.status}
                         </span>
                       </td>
@@ -375,7 +375,7 @@ export default function Dispatch() {
               <div>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {selectedLoad.load_id}
-                  <span className={`status-badge ${selectedLoad.status === 'Pending' ? 'pending' : 'in-transit'}`} style={{ fontSize: '12px' }}>
+                  <span className={`status-badge ${['Delivered', 'Invoiced'].includes(selectedLoad.status) ? 'delivered' : selectedLoad.status === 'In Transit' ? 'in-transit' : selectedLoad.status === 'Assigned' ? 'assigned' : 'unassigned'}`} style={{ fontSize: '12px' }}>
                     {selectedLoad.status}
                   </span>
                 </h3>

@@ -109,7 +109,7 @@ class LoadConfirmView(discord.ui.View):
         async with AsyncSessionLocal() as session:
             assigned_driver = self.selected_driver
             assigned_phone = self.selected_phone
-            assigned_status = 'Dispatched' if self.selected_driver != 'Unassigned' else self.ops_intel.get('workflow_state', 'Pending')
+            assigned_status = 'Assigned' if self.selected_driver != 'Unassigned' else 'Unassigned'
             
             new_load = Load(
                 load_id=self.load_id_val,

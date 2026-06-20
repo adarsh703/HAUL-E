@@ -69,7 +69,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
     return () => clearInterval(interval);
   }, []);
 
-  const activeLoads = loads.filter(l => l.status !== 'Delivered');
+  const activeLoads = loads.filter(l => !['Delivered', 'Invoiced'].includes(l.status));
   const activeVehicles = vehicles.filter(v => v.status === 'Active');
   const maintenanceVehicles = vehicles.filter(v => v.status === 'Maintenance');
 
@@ -215,9 +215,10 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
                   </div>
                 </div>
                 <span className={
-                  load.status === 'Delivered' ? "status-badge delivered" :
+                  load.status === 'Delivered' || load.status === 'Invoiced' ? "status-badge delivered" :
                   load.status === 'In Transit' ? "status-badge in-transit" :
-                  "status-badge pending"
+                  load.status === 'Assigned' ? "status-badge assigned" :
+                  "status-badge unassigned"
                 }>{load.status}</span>
               </div>
             ))
@@ -234,7 +235,7 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
               <div>
                 <h3 style={{ fontSize: '20px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {selectedLoad.load_id}
-                  <span className={`status-badge ${selectedLoad.status === 'Pending' ? 'pending' : 'in-transit'}`} style={{ fontSize: '12px' }}>
+                  <span className={`status-badge ${['Delivered', 'Invoiced'].includes(selectedLoad.status) ? 'delivered' : selectedLoad.status === 'In Transit' ? 'in-transit' : selectedLoad.status === 'Assigned' ? 'assigned' : 'unassigned'}`} style={{ fontSize: '12px' }}>
                     {selectedLoad.status}
                   </span>
                 </h3>

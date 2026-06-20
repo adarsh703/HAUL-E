@@ -184,7 +184,9 @@ Document Text: "{extracted_text[:3000]}"
                                 pdf_path=pdf_path,
                                 bol_path=final_bol
                             )
-                            await message.reply(f"💸 **Invoice generated and sent to {NOTIFY_EMAIL}!**")
+                            load.status = 'Invoiced'
+                            await session.commit()
+                            await message.reply(f"💸 **Invoice generated and sent to {NOTIFY_EMAIL}!** (Status: Invoiced)")
                         except Exception as e:
                             log.error(f"Failed to auto-invoice: {e}", exc_info=True)
                             await message.reply(f"❌ Failed to generate/send invoice: {e}")
