@@ -91,7 +91,15 @@ class LoadConfirmView(discord.ui.View):
                 self.selected_driver = v.driver
                 self.selected_phone = getattr(v, 'phone', None)
                 break
-        await interaction.response.defer()
+                
+        # Update the embed to visually reflect the new choice
+        embed = interaction.message.embeds[0]
+        for idx, field in enumerate(embed.fields):
+            if field.name == "🤖 Predicted Driver":
+                embed.set_field_at(idx, name="🤖 Predicted Driver", value=f"**{self.selected_driver}** (Select below to change)", inline=False)
+                break
+                
+        await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="Create Load", style=discord.ButtonStyle.success, custom_id="btn_create_load", row=1)
     async def create_load_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -261,6 +269,12 @@ class LoadConfirmView(discord.ui.View):
         embed.color = 0x10b981
         if thread:
             embed.add_field(name="🧵 Driver Thread", value=f"<#{thread.id}>", inline=False)
+            
+        for idx, field in enumerate(embed.fields):
+            if field.name == "🤖 Predicted Driver":
+                embed.set_field_at(idx, name="🤖 Assigned Driver", value=f"**{self.selected_driver}**", inline=False)
+                break
+                
         embed.set_footer(text="Load saved to Database & Google Sheets")
         await interaction.edit_original_response(embed=embed, view=None)
 
