@@ -490,10 +490,26 @@ Extract data directly from the attached document.
                         # Removed immediate DB and Sheets insertion
                         
                         # 3. Rich Discord Reply with Confirmation View
-                        score = ops_intel.get('dispatch_readiness_score', 0)
-                        summary = ops_intel.get('dispatcher_summary', 'No summary generated.')
-                        risk = ops_intel.get('risk_analysis', {}).get('classification', 'Unknown')
                         alerts = ops_intel.get('alerts', [])
+                        summary = ops_intel.get('dispatcher_summary', 'No summary generated.')
+                        
+                        # --- Deterministic Logic for Score and Risk ---
+                        calc_score = 100
+                        if not pickup_stop.get('appointment_time'): calc_score -= 15
+                        if not delivery_stop.get('appointment_time'): calc_score -= 15
+                        if str(rate_val) == '0' or not rate_val: calc_score -= 20
+                        if load_data.get('reefer_operations', {}).get('temperature_setpoint') == "": calc_score -= 10
+                        calc_score -= min(len(alerts) * 4, 30) # deduct for alerts
+                        score = max(0, calc_score)
+                        
+                        if len(alerts) >= 8 or str(rate_val) == '0' or score < 70:
+                            risk = "High"
+                        elif len(alerts) >= 4 or score < 90:
+                            risk = "Medium"
+                        else:
+                            risk = "Low"
+                        # ----------------------------------------------
+                        
                         alerts_str = "\n".join([f"⚠️ {a}" for a in alerts]) if alerts else "None"
                         
                         embed = discord.Embed(
