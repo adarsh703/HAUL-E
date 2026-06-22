@@ -207,6 +207,18 @@ class LoadConfirmView(discord.ui.View):
                     description=f"**Driver:** {driver_name.upper()}  |  **Truck:** {truck_number}"
                 )
                 
+                # --- Add Commodity and Equipment ---
+                load_info = self.load_data.get('load_information', {})
+                commodity = load_info.get("commodity", "Unknown")
+                weight = load_info.get("weight", "Unknown")
+                equipment = load_info.get("equipment_type", "Unknown")
+                
+                if commodity != "Unknown" or equipment != "Unknown":
+                    driver_embed.add_field(name="📦 Commodity", value=f"{commodity} ({weight})", inline=True)
+                    driver_embed.add_field(name="🚛 Equipment", value=equipment, inline=True)
+                    # Add an empty field to force a new line before stops
+                    driver_embed.add_field(name="\u200B", value="\u200B", inline=False)
+                
                 stops = self.load_data.get('stops', [])
                 for i, stop in enumerate(stops):
                     stop_type = stop.get('stop_type', 'Stop')
