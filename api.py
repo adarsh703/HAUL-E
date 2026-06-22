@@ -154,6 +154,11 @@ async def delete_load(load_id: str):
         if not load_item:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Load not found")
+            
+        from database.models import TempCheckLog
+        from sqlalchemy import delete
+        await session.execute(delete(TempCheckLog).where(TempCheckLog.load_id == load_id))
+        
         await session.delete(load_item)
         await session.commit()
         
