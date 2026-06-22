@@ -260,6 +260,10 @@ Has BOL: "{has_bol}"
                                 date=load.pickup_date
                             )
                             
+                            # Save invoice path to database
+                            load.invoice_path = pdf_path
+                            await session.commit()
+                            
                             # Show in Discord and ask for approval
                             view = InvoiceApprovalView(load.load_id, pdf_path, final_bol, pod_path, NOTIFY_EMAIL)
                             await message.reply(

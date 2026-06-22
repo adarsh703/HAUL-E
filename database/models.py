@@ -48,6 +48,7 @@ class Load(Base):
     hard_copy_pod_required: Mapped[bool] = mapped_column(default=False, nullable=True)
     bol_path: Mapped[str] = mapped_column(String(500), nullable=True)
     pod_path: Mapped[str] = mapped_column(String(500), nullable=True)
+    invoice_path: Mapped[str] = mapped_column(String(500), nullable=True)
     temp_check_active: Mapped[bool] = mapped_column(default=False, nullable=True)
     discord_thread_id: Mapped[str] = mapped_column(String(50), nullable=True)
 

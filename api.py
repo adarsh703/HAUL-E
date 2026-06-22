@@ -74,7 +74,9 @@ app.add_middleware(
 import os
 from fastapi.staticfiles import StaticFiles
 os.makedirs("uploads", exist_ok=True)
+os.makedirs("invoices", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/invoices", StaticFiles(directory="invoices"), name="invoices")
 
 class LoadCreate(BaseModel):
     load_id: str
@@ -108,6 +110,7 @@ async def get_loads():
                 "operational_intelligence": load.operational_intelligence,
                 "bol_path": load.bol_path,
                 "pod_path": load.pod_path,
+                "invoice_path": load.invoice_path,
                 "driver_phone": load.driver_phone,
                 "discord_thread_id": load.discord_thread_id,
                 "temp_logs": [
