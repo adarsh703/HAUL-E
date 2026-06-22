@@ -60,6 +60,7 @@ interface LiveRoute {
   origin: GeoPoint;
   destination: GeoPoint;
   truck: GeoPoint;
+  pathCoords?: [number, number][];
 }
 
 export default function LiveMap() {
@@ -69,8 +70,24 @@ export default function LiveMap() {
   useEffect(() => {
     fetch('/api/live_map')
       .then(res => res.json())
-      .then(data => {
-        setRoutes(data.routes || []);
+      .then(async data => {
+        const fetchedRoutes = data.routes || [];
+        
+        const routesWithPaths = await Promise.all(fetchedRoutes.map(async (route: LiveRoute) => {
+          try {
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${route.origin.lon},${route.origin.lat};${route.destination.lon},${route.destination.lat}?overview=full&geometries=geojson`);
+            const osrmData = await res.json();
+            if (osrmData.code === 'Ok' && osrmData.routes.length > 0) {
+              const coords = osrmData.routes[0].geometry.coordinates;
+              route.pathCoords = coords.map((c: [number, number]) => [c[1], c[0]]);
+            }
+          } catch (e) {
+            console.error("OSRM Routing error", e);
+          }
+          return route;
+        }));
+
+        setRoutes(routesWithPaths);
         setLoading(false);
       })
       .catch(err => {
@@ -119,14 +136,14 @@ export default function LiveMap() {
           <div key={route.load_id}>
             {/* Draw Path from Origin to Destination */}
             <Polyline 
-              positions={[
+              positions={route.pathCoords || [
                 [route.origin.lat, route.origin.lon],
                 [route.destination.lat, route.destination.lon]
               ]} 
               color={color}
-              weight={3}
-              opacity={0.4}
-              dashArray="5, 10"
+              weight={4}
+              opacity={0.6}
+              dashArray={route.pathCoords ? "" : "5, 10"}
             />
             
             {/* Origin Marker */}
