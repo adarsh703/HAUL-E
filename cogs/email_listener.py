@@ -253,8 +253,23 @@ Email Body Context:
                     try:
                         from cogs.document_ocr import LoadConfirmView
                         
-                        LOAD_CREATION_CHANNEL_ID = self.allowed_channel
-                        confirmation_channel = self.bot.get_channel(LOAD_CREATION_CHANNEL_ID)
+                        confirmation_channel = None
+                        if self.allowed_channel != 0:
+                            confirmation_channel = self.bot.get_channel(self.allowed_channel)
+                        
+                        # Fallback to the original hardcoded channel ID
+                        if not confirmation_channel:
+                            confirmation_channel = self.bot.get_channel(1512055979259334730)
+                            
+                        # Final fallback: just use the very first text channel the bot can see
+                        if not confirmation_channel:
+                            for guild in self.bot.guilds:
+                                for channel in guild.text_channels:
+                                    if channel.permissions_for(guild.me).send_messages:
+                                        confirmation_channel = channel
+                                        break
+                                if confirmation_channel:
+                                    break
                         
                         if confirmation_channel:
                             commodity = load_info.get("commodity", "Unknown")
