@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Truck, MapPin } from 'lucide-react';
@@ -148,6 +148,9 @@ export default function LiveMap() {
             
             {/* Origin Marker */}
             <Marker position={[route.origin.lat, route.origin.lon]} icon={createCityIcon()}>
+              <Tooltip permanent direction="bottom" offset={[0, 5]} opacity={0.8}>
+                <span style={{ fontWeight: 600, fontSize: '11px', color: '#111' }}>{route.origin.name}</span>
+              </Tooltip>
               <Popup>
                 <strong>Origin:</strong> {route.origin.name} <br/>
                 Load: {route.load_id}
@@ -156,6 +159,9 @@ export default function LiveMap() {
             
             {/* Destination Marker */}
             <Marker position={[route.destination.lat, route.destination.lon]} icon={createCityIcon()}>
+              <Tooltip permanent direction="bottom" offset={[0, 5]} opacity={0.8}>
+                <span style={{ fontWeight: 600, fontSize: '11px', color: '#111' }}>{route.destination.name}</span>
+              </Tooltip>
               <Popup>
                 <strong>Destination:</strong> {route.destination.name} <br/>
                 Load: {route.load_id}
