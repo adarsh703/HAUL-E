@@ -7,11 +7,9 @@ import os
 import re
 import asyncio
 import json
-import pytesseract
-from pdf2image import convert_from_bytes
-from PIL import Image
 import io
 import uuid
+import mimetypes
 
 from google import genai
 from google.genai import types
@@ -77,8 +75,8 @@ Return ONLY the email body you would reply with."""
             log.error(f"Error generating negotiation: {e}")
             return ""
 
-    async def extract_load_json(self, ocr_text: str, user_text: str = "") -> dict:
-        """Extract structured load data from RC text using Gemini AI."""
+    async def extract_load_json(self, doc_parts: list[types.Part], user_text: str = "") -> dict:
+        """Extract structured load data from RC attachments using Gemini AI natively."""
         try:
             prompt = f"""
 You are the intelligence layer of a modern Transportation Management System (TMS).
@@ -129,12 +127,13 @@ Ensure the JSON has this structure:
 CRITICAL: Check if the document mentions requiring a "hard copy" of the POD/Proof of Delivery.
 If yes, set "hard_copy_pod_required" to true.
 
-OCR Text:
-{ocr_text[:10000]}
+Email Body Context:
+{user_text}
 """
+            contents = [prompt] + doc_parts
             response = await self.gemini_client.aio.models.generate_content(
                 model=self.model,
-                contents=prompt
+                contents=contents
             )
             raw_json = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(raw_json)
@@ -174,20 +173,27 @@ OCR Text:
 
                 # ── If email has PDF/image attachments → treat as Rate Confirmation ──
                 if attachments:
-                    combined_text = ""
+                    doc_parts = []
                     saved_documents = []
                     
                     for filename, file_bytes in attachments:
                         log.info(f"Processing attachment: {filename} from {sender_email}")
                         
-                        # OCR the attachment
-                        if filename.lower().endswith('.pdf'):
-                            images = convert_from_bytes(file_bytes)
-                            for img in images:
-                                combined_text += pytesseract.image_to_string(img) + "\n"
-                        else:
-                            img = Image.open(io.BytesIO(file_bytes))
-                            combined_text += pytesseract.image_to_string(img) + "\n"
+                        # Guess mime type
+                        mime_type, _ = mimetypes.guess_type(filename)
+                        if not mime_type:
+                            if filename.lower().endswith('.pdf'):
+                                mime_type = 'application/pdf'
+                            elif filename.lower().endswith('.png'):
+                                mime_type = 'image/png'
+                            elif filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
+                                mime_type = 'image/jpeg'
+                            else:
+                                mime_type = 'application/octet-stream'
+
+                        # Create Gemini Part
+                        doc_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+                        doc_parts.append(doc_part)
 
                         # Save the attachment
                         file_ext = os.path.splitext(filename)[1]
@@ -195,14 +201,14 @@ OCR Text:
                         saved_filepath = os.path.join("/home/no_one/Desktop/broker-bot/uploads", saved_filename)
                         with open(saved_filepath, "wb") as f:
                             f.write(file_bytes)
-                        saved_documents.append(f"http://127.0.0.1:8000/uploads/{saved_filename}")
+                        saved_documents.append(f"{os.getenv('VITE_API_URL', 'http://127.0.0.1:20296')}/uploads/{saved_filename}")
 
-                    if not combined_text.strip():
-                        log.warning(f"No text extracted from attachments from {sender_email}")
+                    if not doc_parts:
+                        log.warning(f"No valid attachments found from {sender_email}")
                         continue
 
-                    # Extract load data with AI using ALL combined text and email body
-                    load_data = await self.extract_load_json(combined_text, body)
+                    # Extract load data with AI using native file parts and email body
+                    load_data = await self.extract_load_json(doc_parts, body)
                     if not load_data:
                         log.warning(f"Could not extract load data from attachments")
                         continue
