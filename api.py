@@ -1042,11 +1042,25 @@ async def get_live_map():
         
         routes = []
         for load in active_loads:
-            if not load.origin or not load.destination:
+            od = load.origin_dest or ""
+            origin_str, dest_str = "", ""
+            if " to " in od:
+                parts = od.split(" to ", 1)
+            elif " → " in od:
+                parts = od.split(" → ", 1)
+            elif "->" in od:
+                parts = od.split("->", 1)
+            else:
+                parts = [od, od]
+                
+            if len(parts) == 2:
+                origin_str, dest_str = parts[0].strip(), parts[1].strip()
+                
+            if not origin_str or not dest_str:
                 continue
                 
-            origin_geo = await geocode_city(load.origin)
-            dest_geo = await geocode_city(load.destination)
+            origin_geo = await geocode_city(origin_str)
+            dest_geo = await geocode_city(dest_str)
             
             truck_geo = None
             if load.driver and load.driver in db_v_dict:
@@ -1072,8 +1086,8 @@ async def get_live_map():
             routes.append({
                 "load_id": load.load_id,
                 "driver": load.driver,
-                "origin": {"name": load.origin, "lat": origin_geo["lat"], "lon": origin_geo["lon"]},
-                "destination": {"name": load.destination, "lat": dest_geo["lat"], "lon": dest_geo["lon"]},
+                "origin": {"name": origin_str, "lat": origin_geo["lat"], "lon": origin_geo["lon"]},
+                "destination": {"name": dest_str, "lat": dest_geo["lat"], "lon": dest_geo["lon"]},
                 "truck": truck_geo
             })
             
