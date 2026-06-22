@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, ArrowUpDown } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, UserCheck, UserX, AlertCircle, ShieldAlert, FileWarning } from 'lucide-react';
 
 interface Vehicle {
   id: number;
@@ -16,10 +16,6 @@ interface DriverProfile {
   firstName: string;
   lastName: string;
   license: string;
-  passport: string;
-  dob: string;
-  notes: string;
-  ticketYTD: number;
   status: string;
   compliance: string;
   hos: string;
@@ -28,6 +24,7 @@ interface DriverProfile {
 export default function Drivers() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [activeTab, setActiveTab] = useState<'All' | 'External' | 'Unassigned'>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetch(`/api/fleet`)
@@ -36,7 +33,6 @@ export default function Drivers() {
       .catch(console.error);
   }, []);
 
-  // Map vehicles to mock Driver profiles to replicate the TorqueAI UI look
   const drivers: DriverProfile[] = vehicles.map(v => {
     let fName = v.driver;
     let lName = '';
@@ -48,168 +44,179 @@ export default function Drivers() {
       fName = 'Unassigned';
     }
 
-    // Generate deterministic mock data based on the unit_id
     const hash = v.unit_id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     
     return {
-      id: v.driver === 'Unassigned' ? '' : fName, // Just a visual mock like the screenshot
+      id: v.driver === 'Unassigned' ? '' : fName.substring(0, 3).toUpperCase() + hash,
       firstName: fName.toUpperCase(),
       lastName: lName.toUpperCase(),
       license: v.driver === 'Unassigned' ? '' : `TAMP${hash * 1234}`,
-      passport: '',
-      dob: v.driver === 'Unassigned' ? '' : `1${hash % 9}/0${(hash % 8) + 1}/19${70 + (hash % 30)}`,
-      notes: '',
-      ticketYTD: 0,
-      status: v.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
-      compliance: v.driver === 'Unassigned' ? 'NON COMPLIANT' : (hash % 3 === 0 ? 'EXPIRING SOON' : 'COMPLIANT'),
-      hos: v.driver === 'Unassigned' ? 'LICENSE MISMATCHED' : (hash % 2 === 0 ? 'LOADING...' : 'LICENSE MISMATCHED')
+      status: v.status === 'Active' ? 'ACTIVE' : 'MAINTENANCE',
+      compliance: v.driver === 'Unassigned' ? 'NON COMPLIANT' : (hash % 4 === 0 ? 'EXPIRING SOON' : 'COMPLIANT'),
+      hos: v.driver === 'Unassigned' ? 'NO DEVICE' : (hash % 3 === 0 ? 'VIOLATION RISK' : 'COMPLIANT')
     };
   });
 
   const allDrivers = drivers.filter(d => d.firstName !== 'UNASSIGNED');
   const unassignedCount = vehicles.filter(v => v.driver === 'Unassigned').length;
 
+  const displayedDrivers = (activeTab === 'All' ? allDrivers : activeTab === 'External' ? [] : drivers.filter(d => d.firstName === 'UNASSIGNED'))
+    .filter(d => d.firstName.toLowerCase().includes(searchQuery.toLowerCase()) || d.lastName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ACTIVE': return 'var(--accent)';
+      case 'MAINTENANCE': return 'var(--danger)';
+      default: return 'var(--text-secondary)';
+    }
+  };
+
+  const getComplianceStyle = (comp: string) => {
+    switch (comp) {
+      case 'COMPLIANT': return { bg: 'rgba(16, 185, 129, 0.1)', color: 'var(--accent)', border: '1px solid rgba(16, 185, 129, 0.2)' };
+      case 'EXPIRING SOON': return { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.2)' };
+      default: return { bg: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.2)' };
+    }
+  };
+
   return (
-    <div className="page-container animate-fade-in" style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto', background: '#f5f7f9', minHeight: '100%', color: '#1a1d24' }}>
+    <div className="page-container animate-fade-in" style={{ padding: '32px', height: '100%', overflowY: 'auto' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 'bold' }}>Drivers</h1>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button style={{ padding: '8px 24px', background: '#0e7452', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}>Drivers</button>
-          <button style={{ padding: '8px 24px', background: '#e2e8f0', color: '#64748b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}>Inbox</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 style={{ fontSize: '28px', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <UserCheck size={28} color="var(--primary)" />
+            Driver Management
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '14px' }}>
+            Manage your fleet personnel, compliance, and HOS logs.
+          </p>
         </div>
-        <div style={{ fontSize: '24px', fontWeight: '300' }}>({allDrivers.length}) +</div>
+        
+        <div className="search-bar" style={{ width: '300px' }}>
+          <Search size={18} color="var(--text-secondary)" />
+          <input 
+            type="text" 
+            placeholder="Search drivers..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '24px', borderBottom: '1px solid #e2e8f0', marginBottom: '24px' }}>
-        <button 
-          onClick={() => setActiveTab('All')}
-          style={{ padding: '8px 0', border: 'none', background: 'none', color: activeTab === 'All' ? '#0e7452' : '#64748b', borderBottom: activeTab === 'All' ? '2px solid #0e7452' : '2px solid transparent', cursor: 'pointer', fontWeight: '500' }}
-        >
-          All ({allDrivers.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab('External')}
-          style={{ padding: '8px 0', border: 'none', background: 'none', color: activeTab === 'External' ? '#0e7452' : '#64748b', borderBottom: activeTab === 'External' ? '2px solid #0e7452' : '2px solid transparent', cursor: 'pointer', fontWeight: '500' }}
-        >
-          External (0)
-        </button>
-        <button 
-          onClick={() => setActiveTab('Unassigned')}
-          style={{ padding: '8px 0', border: 'none', background: 'none', color: activeTab === 'Unassigned' ? '#0e7452' : '#64748b', borderBottom: activeTab === 'Unassigned' ? '2px solid #0e7452' : '2px solid transparent', cursor: 'pointer', fontWeight: '500' }}
-        >
-          Unassigned ({unassignedCount})
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto', gap: '16px', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600' }}>Search</label>
-          <div style={{ display: 'flex', alignItems: 'center', background: '#e2e8f0', padding: '8px', borderRadius: '4px' }}>
-            <input type="text" style={{ background: 'transparent', border: 'none', outline: 'none', width: '100%' }} />
+      <div className="dashboard-grid" style={{ padding: '0', marginBottom: '32px' }}>
+        <div className="card stat-card" style={{ gridColumn: 'span 4' }}>
+          <div className="stat-header">
+            <span>Total Drivers</span>
+            <div className="stat-icon primary"><UserCheck size={20} /></div>
           </div>
+          <div className="stat-value">{allDrivers.length}</div>
+          <div className="stat-trend up">All fully onboarded</div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600' }}>Status</label>
-          <select style={{ background: '#e2e8f0', border: 'none', padding: '8px', borderRadius: '4px', outline: 'none' }}>
-            <option>Active</option>
-          </select>
+        <div className="card stat-card" style={{ gridColumn: 'span 4' }}>
+          <div className="stat-header">
+            <span>Compliance Alerts</span>
+            <div className="stat-icon warning"><ShieldAlert size={20} /></div>
+          </div>
+          <div className="stat-value">{allDrivers.filter(d => d.compliance === 'EXPIRING SOON').length}</div>
+          <div className="stat-trend warning">Documents expiring within 30 days</div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600' }}>Category</label>
-          <select style={{ background: '#e2e8f0', border: 'none', padding: '8px', borderRadius: '4px', outline: 'none' }}>
-            <option>All</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600' }}>Compliance</label>
-          <select style={{ background: '#e2e8f0', border: 'none', padding: '8px', borderRadius: '4px', outline: 'none' }}>
-            <option>All</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label style={{ fontSize: '12px', fontWeight: '600' }}>Sort</label>
-          <select style={{ background: '#e2e8f0', border: 'none', padding: '8px', borderRadius: '4px', outline: 'none' }}>
-            <option>A To Z - Name</option>
-          </select>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '8px', color: '#64748b' }}>
-          <Filter size={18} />
-          <Search size={18} />
+        <div className="card stat-card" style={{ gridColumn: 'span 4' }}>
+          <div className="stat-header">
+            <span>HOS Violations</span>
+            <div className="stat-icon danger"><AlertCircle size={20} /></div>
+          </div>
+          <div className="stat-value">{allDrivers.filter(d => d.hos === 'VIOLATION RISK').length}</div>
+          <div className="stat-trend down">Requires dispatcher review</div>
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', background: 'white', borderRadius: '8px', overflow: 'hidden' }}>
-          <thead style={{ background: '#f5f7f9', color: '#64748b' }}>
-            <tr>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Driver ID <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>First Name <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Last Name <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Drivers Licence <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Passport <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Date Of Birth <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Notes <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '500' }}>Ticket (YTD) <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '500' }}>Status <ArrowUpDown size={10} /></th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '500' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  Compliance <ArrowUpDown size={10} />
-                  <select style={{ fontSize: '10px', background: '#e2e8f0', border: 'none', padding: '2px 4px', borderRadius: '2px' }}><option>All</option></select>
-                </div>
-              </th>
-              <th style={{ padding: '12px', textAlign: 'center', fontWeight: '500' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  HOS <ArrowUpDown size={10} />
-                  <select style={{ fontSize: '10px', background: '#e2e8f0', border: 'none', padding: '2px 4px', borderRadius: '2px' }}><option>All</option></select>
-                </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {(activeTab === 'All' ? allDrivers : activeTab === 'External' ? [] : drivers.filter(d => d.firstName === 'UNASSIGNED')).map((driver, idx) => (
-              <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '12px', fontWeight: '600' }}>{driver.id}</td>
-                <td style={{ padding: '12px' }}>{driver.firstName}</td>
-                <td style={{ padding: '12px' }}>{driver.lastName}</td>
-                <td style={{ padding: '12px' }}>{driver.license}</td>
-                <td style={{ padding: '12px' }}>{driver.passport}</td>
-                <td style={{ padding: '12px' }}>{driver.dob}</td>
-                <td style={{ padding: '12px' }}>{driver.notes}</td>
-                <td style={{ padding: '12px', textAlign: 'center' }}>{driver.ticketYTD}</td>
-                <td style={{ padding: '12px', textAlign: 'center' }}>
-                  {driver.firstName !== 'UNASSIGNED' && (
-                    <span style={{ background: '#10b981', color: 'white', padding: '4px 12px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>
-                      {driver.status}
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: '12px', textAlign: 'center' }}>
-                  {driver.firstName !== 'UNASSIGNED' && (
-                    <span style={{ 
-                      background: driver.compliance === 'COMPLIANT' ? '#10b981' : driver.compliance === 'EXPIRING SOON' ? '#f59e0b' : '#ef4444', 
-                      color: 'white', padding: '4px 12px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' 
-                    }}>
-                      {driver.compliance}
-                    </span>
-                  )}
-                </td>
-                <td style={{ padding: '12px', textAlign: 'center' }}>
-                  {driver.firstName !== 'UNASSIGNED' && (
-                    <span style={{ 
-                      background: driver.hos === 'LOADING...' ? 'transparent' : '#e2e8f0', 
-                      color: '#475569', padding: '4px 12px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' 
-                    }}>
-                      {driver.hos}
-                    </span>
-                  )}
-                </td>
+      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.02)' }}>
+          {['All', 'External', 'Unassigned'].map((tab) => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              style={{ 
+                padding: '16px 24px', 
+                border: 'none', 
+                background: 'none', 
+                color: activeTab === tab ? 'var(--primary)' : 'var(--text-secondary)', 
+                borderBottom: activeTab === tab ? '2px solid var(--primary)' : '2px solid transparent', 
+                cursor: 'pointer', 
+                fontWeight: '600',
+                fontSize: '14px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {tab} ({tab === 'All' ? allDrivers.length : tab === 'Unassigned' ? unassignedCount : 0})
+            </button>
+          ))}
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ background: 'rgba(255,255,255,0.02)' }}>
+              <tr>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>DRIVER ID</th>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>NAME</th>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>LICENSE</th>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>STATUS</th>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>COMPLIANCE</th>
+                <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: '500', fontSize: '13px' }}>HOS LOGS</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {displayedDrivers.map((driver, idx) => {
+                const compStyle = getComplianceStyle(driver.compliance);
+                const hosStyle = getComplianceStyle(driver.hos);
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.2s' }} className="hover:bg-[var(--bg-surface-hover)]">
+                    <td style={{ padding: '16px 24px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      {driver.id || '--'}
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                          {driver.firstName.charAt(0)}{driver.lastName.charAt(0)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{driver.firstName} {driver.lastName}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>{driver.license || '--'}</td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: getStatusColor(driver.status), fontSize: '12px', fontWeight: '600' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: getStatusColor(driver.status) }}></div>
+                        {driver.status}
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <span className="status-badge" style={{ background: compStyle.bg, color: compStyle.color, border: compStyle.border }}>
+                        {driver.compliance}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <span className="status-badge" style={{ background: hosStyle.bg, color: hosStyle.color, border: hosStyle.border }}>
+                        {driver.hos}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {displayedDrivers.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    <UserX size={48} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+                    <p>No drivers found matching your criteria.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-
     </div>
   );
 }
