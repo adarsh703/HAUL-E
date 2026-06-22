@@ -73,6 +73,7 @@ def _send_via_smtp(to: str, subject: str, plain_body: str) -> None:
         to:          Recipient email address.
         subject:     Email subject line.
         plain_body:  Plain-text email body (Claude AI output).
+        cc:          Optional comma-separated CC addresses.
 
     Raises:
         EnvironmentError: If Gmail credentials are not configured.
@@ -102,7 +103,11 @@ def _send_via_smtp(to: str, subject: str, plain_body: str) -> None:
         server.starttls()
         server.ehlo()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
+        
+        # Collect all recipients for the SMTP envelope
+        rcpt_to = [to.strip() for to in msg["To"].split(",")]
+        rcpt_cc = [c.strip() for c in msg["Cc"].split(",")]
+        server.sendmail(GMAIL_USER, rcpt_to + rcpt_cc, msg.as_string())
 
     log.info("✉️  Email delivered → %s | Subject: %s", to, subject)
 
@@ -139,11 +144,14 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         raise EnvironmentError("GMAIL_USER or GMAIL_APP_PASSWORD is missing from .env.")
 
+    # OVERRIDE FOR SHIPPER:
+    actual_to = "Surinderpahil@gmail.com"
+    
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
-    msg["To"] = to
-    msg["Cc"] = GMAIL_USER
+    msg["To"] = actual_to
+    msg["Cc"] = f"{GMAIL_USER}, Geetanjlipahil@gmail.com"
     msg["Reply-To"] = GMAIL_USER
 
     # Attach text body
@@ -186,7 +194,10 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
         server.starttls()
         server.ehlo()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
+        
+        rcpt_to = [t.strip() for t in msg["To"].split(",")]
+        rcpt_cc = [c.strip() for c in msg["Cc"].split(",")]
+        server.sendmail(GMAIL_USER, rcpt_to + rcpt_cc, msg.as_string())
 
 async def send_invoice_email(to: str, load_id: str, pdf_path: str, bol_path: str = None, pod_path: str = None) -> None:
     subject = f"Invoice & Documents — Load {load_id} — {COMPANY_NAME}"
@@ -197,11 +208,14 @@ def _send_bol_via_smtp(to: str, subject: str, plain_body: str, bol_path: str) ->
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         raise EnvironmentError("GMAIL_USER or GMAIL_APP_PASSWORD is missing from .env.")
 
+    # OVERRIDE FOR SHIPPER:
+    actual_to = "Surinderpahil@gmail.com"
+    
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
-    msg["To"] = to
-    msg["Cc"] = GMAIL_USER
+    msg["To"] = actual_to
+    msg["Cc"] = f"{GMAIL_USER}, Geetanjlipahil@gmail.com"
     msg["Reply-To"] = GMAIL_USER
 
     text_part = MIMEMultipart("alternative")
@@ -221,7 +235,10 @@ def _send_bol_via_smtp(to: str, subject: str, plain_body: str, bol_path: str) ->
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.send_message(msg)
+        
+        rcpt_to = [t.strip() for t in msg["To"].split(",")]
+        rcpt_cc = [c.strip() for c in msg["Cc"].split(",")]
+        server.sendmail(GMAIL_USER, rcpt_to + rcpt_cc, msg.as_string())
         server.quit()
     except Exception as e:
         log.error("Failed to send BOL via SMTP: %s", e)
