@@ -123,25 +123,27 @@ class DriverPortal(commands.Cog):
             load_id = load_record.load_id
 
             filename_hint = message.attachments[0].filename if message.attachments else "None"
+            has_bol = "Yes" if load_record.bol_path else "No"
+            
             prompt = f"""
 Analyze this message from a truck driver in a dispatch thread for Load {load_id}.
 Determine the driver's intent. Return a JSON object with key 'action'.
 
-CRITICAL: If a document/image is attached, classify it by its CONTENT and FILENAME:
-- If it's a Bill of Lading (BOL), shipping receipt, pickup confirmation, or any document showing freight was picked up (or filename implies BOL) → action is "loaded"
-- If it's a Proof of Delivery (POD), delivery receipt, signed delivery confirmation, or any document showing freight was delivered (or filename implies POD) → action is "delivered"
-The driver does NOT need to type anything. The document alone is enough to determine the action.
+CRITICAL: If a document/image is attached, follow this strict sequential rule:
+- If the load DOES NOT have a BOL yet (Has BOL: No), this first document is the Bill of Lading (BOL) → action MUST be "loaded"
+- If the load ALREADY has a BOL (Has BOL: Yes), this second document is the Proof of Delivery (POD) → action MUST be "delivered"
 
-Possible actions:
-- "loaded" — a BOL or pickup document is attached, OR driver says they've picked up
-- "delivered" — a POD or delivery document is attached, OR driver says they've delivered
+If NO document is attached, classify based on the text:
+- "loaded" — driver says they've picked up or are loaded
+- "delivered" — driver says they've delivered or are empty
 - "temp_response" — driver is responding to a temperature check (extract temp in 'temp_value')
 - "issue" — driver is reporting a problem
-- "unknown" — not a dispatch-related message and no recognizable document attached
+- "unknown" — just chat or unrelated
 
 Return JSON like: {{"action": "loaded"}} or {{"action": "temp_response", "temp_value": "-2°F"}}
 Driver Message: "{content}"
 Attached Filename: "{filename_hint}"
+Has BOL: "{has_bol}"
 """
             try:
                 contents = [prompt]
