@@ -122,14 +122,14 @@ class DriverPortal(commands.Cog):
         if load_record:
             load_id = load_record.load_id
 
-            # Use AI to determine intent
+            filename_hint = message.attachments[0].filename if message.attachments else "None"
             prompt = f"""
 Analyze this message from a truck driver in a dispatch thread for Load {load_id}.
 Determine the driver's intent. Return a JSON object with key 'action'.
 
-CRITICAL: If a document/image is attached, classify it by its CONTENT:
-- If it's a Bill of Lading (BOL), shipping receipt, pickup confirmation, or any document showing freight was picked up → action is "loaded"
-- If it's a Proof of Delivery (POD), delivery receipt, signed delivery confirmation, or any document showing freight was delivered → action is "delivered"
+CRITICAL: If a document/image is attached, classify it by its CONTENT and FILENAME:
+- If it's a Bill of Lading (BOL), shipping receipt, pickup confirmation, or any document showing freight was picked up (or filename implies BOL) → action is "loaded"
+- If it's a Proof of Delivery (POD), delivery receipt, signed delivery confirmation, or any document showing freight was delivered (or filename implies POD) → action is "delivered"
 The driver does NOT need to type anything. The document alone is enough to determine the action.
 
 Possible actions:
@@ -141,6 +141,7 @@ Possible actions:
 
 Return JSON like: {{"action": "loaded"}} or {{"action": "temp_response", "temp_value": "-2°F"}}
 Driver Message: "{content}"
+Attached Filename: "{filename_hint}"
 """
             try:
                 contents = [prompt]
