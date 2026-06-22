@@ -251,7 +251,15 @@ Email Body Context:
 
                     # Post confirmation to Discord load-creation channel
                     try:
-                        from cogs.document_ocr import LoadConfirmView
+                        from cogs.document_ocr import LoadConfirmView, score_and_sort_vehicles
+                        from database.models import Vehicle, AsyncSessionLocal
+                        from sqlalchemy.future import select
+                        
+                        # Fetch active vehicles for the dropdown
+                        async with AsyncSessionLocal() as session:
+                            result = await session.execute(select(Vehicle))
+                            vehicles = result.scalars().all()
+                        sorted_vehicles, _ = await score_and_sort_vehicles(vehicles)
                         
                         confirmation_channel = None
                         if self.allowed_channel != 0:
@@ -301,7 +309,8 @@ Email Body Context:
                                 rate_val=rate_val,
                                 ops_intel=ops_intel,
                                 broker=broker,
-                                original_message=None
+                                original_message=None,
+                                active_vehicles=sorted_vehicles
                             )
                             
                             await confirmation_channel.send(
