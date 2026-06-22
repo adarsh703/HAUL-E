@@ -283,20 +283,103 @@ Email Body Context:
                             commodity = load_info.get("commodity", "Unknown")
                             weight = load_info.get("weight", "Unknown")
                             equipment = load_info.get("equipment_type", "Unknown")
-                            temp = load_info.get("temperature_requirements", "N/A")
                             summary = ops_intel.get('dispatcher_summary', 'No summary generated.')
+                            alerts = ops_intel.get('alerts', [])
+                            
+                            # --- Deterministic Logic for Score and Risk ---
+                            stops = load_data.get('stops', [])
+                            pickup_stop = next((s for s in stops if 'Pickup' in s.get('stop_type', '')), stops[0] if stops else {})
+                            delivery_stop = next((s for s in reversed(stops) if 'Delivery' in s.get('stop_type', '')), stops[-1] if len(stops) > 1 else {})
+                            
+                            calc_score = 100
+                            if not pickup_stop.get('appointment_time'): calc_score -= 15
+                            if not delivery_stop.get('appointment_time'): calc_score -= 15
+                            if str(rate_val) == '0' or not rate_val: calc_score -= 20
+                            if load_data.get('reefer_operations', {}).get('temperature_setpoint') == "": calc_score -= 10
+                            calc_score -= min(len(alerts) * 4, 30) # deduct for alerts
+                            score = max(0, calc_score)
+                            
+                            if len(alerts) >= 8 or str(rate_val) == '0' or score < 70:
+                                risk = "High"
+                            elif len(alerts) >= 4 or score < 90:
+                                risk = "Medium"
+                            else:
+                                risk = "Low"
+                            # ----------------------------------------------
                             
                             embed = discord.Embed(
                                 title=f"📧 New RC from Email — {load_id_val}",
                                 description=f"Rate Confirmation received from **{sender_email}**",
                                 color=0xf59e0b
                             )
-                            embed.add_field(name="📍 Route", value=origin_dest, inline=False)
-                            embed.add_field(name="💵 Rate", value=f"${rate_val}", inline=True)
+                            
+                            origin_str = pickup_stop.get('city_state') or pickup_stop.get('address') or 'Unknown'
+                            dest_str = delivery_stop.get('city_state') or delivery_stop.get('address') or 'Unknown'
+                            
+                            embed.add_field(name="📍 Origin", value=origin_str, inline=True)
+                            embed.add_field(name="🏁 Destination", value=dest_str, inline=True)
+                            embed.add_field(name="💰 Rate", value=f"${rate_val}", inline=True)
+                            
                             embed.add_field(name="📦 Commodity", value=f"{commodity} ({weight})", inline=True)
                             embed.add_field(name="🚛 Equipment", value=equipment, inline=True)
-                            embed.add_field(name="🌡️ Temp", value=temp, inline=True)
-                            embed.add_field(name="🧠 Summary", value=summary, inline=False)
+                            
+                            embed.add_field(name="📊 Readiness Score", value=f"{score}/100", inline=True)
+                            
+                            risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
+                            embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
+                            
+                            # --- Dedicated Temperature Requirements Field ---
+                            reefer = load_data.get('reefer_operations', {})
+                            temp_setpoint = reefer.get('temperature_setpoint') or ''
+                            temp_range = reefer.get('temperature_range') or ''
+                            temp_general = load_info.get('temperature_requirements') or ''
+                            continuous = reefer.get('continuous_mode', False)
+                            precool = reefer.get('pre_cool_required', False)
+                            
+                            temp_lines = []
+                            if temp_setpoint and temp_setpoint.lower() != 'n/a':
+                                temp_lines.append(f"🎯 **Setpoint:** {temp_setpoint}")
+                            if temp_range and temp_range.lower() != 'n/a':
+                                temp_lines.append(f"📏 **Range:** {temp_range}")
+                            if temp_general and temp_general.lower() != 'n/a' and temp_general != temp_setpoint:
+                                temp_lines.append(f"📋 **Requirement:** {temp_general}")
+                            if continuous:
+                                temp_lines.append("🔄 **Mode:** Continuous")
+                            if precool:
+                                temp_lines.append("❄️ **Pre-Cool:** Required")
+                            
+                            if temp_lines:
+                                embed.add_field(
+                                    name="🌡️ TEMPERATURE REQUIREMENTS",
+                                    value="\n".join(temp_lines),
+                                    inline=False
+                                )
+                                alerts = [a for a in alerts if 'temperature' not in a.lower() and 'temp ' not in a.lower() and 'reefer' not in a.lower()]
+                            
+                            broker_contact = []
+                            if load_info.get('broker_email'): broker_contact.append(f"📧 {load_info['broker_email']}")
+                            if load_info.get('broker_phone'): broker_contact.append(f"📞 {load_info['broker_phone']}")
+                            if broker_contact:
+                                embed.add_field(name="👔 Broker Contact", value="\n".join(broker_contact), inline=False)
+                            
+                            embed.add_field(name="🧠 Dispatcher Summary", value=summary[:1021] + "..." if len(summary) > 1024 else summary, inline=False)
+                            
+                            if alerts:
+                                chunk = ""
+                                chunk_idx = 1
+                                for a in alerts:
+                                    alert_str = f"⚠️ {a}\n"
+                                    if len(chunk) + len(alert_str) > 1024:
+                                        name = "🚨 Actionable Alerts" if chunk_idx == 1 else f"🚨 Actionable Alerts (Cont. {chunk_idx})"
+                                        embed.add_field(name=name, value=chunk.strip(), inline=False)
+                                        chunk = alert_str
+                                        chunk_idx += 1
+                                    else:
+                                        chunk += alert_str
+                                if chunk:
+                                    name = "🚨 Actionable Alerts" if chunk_idx == 1 else f"🚨 Actionable Alerts (Cont. {chunk_idx})"
+                                    embed.add_field(name=name, value=chunk.strip(), inline=False)
+
                             embed.set_footer(text="Awaiting Confirmation — from email")
                             
                             view = LoadConfirmView(

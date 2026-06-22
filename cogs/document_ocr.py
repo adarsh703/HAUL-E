@@ -635,6 +635,14 @@ Extract data directly from the attached document.
                         embed.add_field(name="📍 Origin", value=origin_str, inline=True)
                         embed.add_field(name="🏁 Destination", value=dest_str, inline=True)
                         embed.add_field(name="💰 Rate", value=f"${rate_val}", inline=True)
+                        
+                        commodity = load_info.get("commodity", "Unknown")
+                        weight = load_info.get("weight", "Unknown")
+                        equipment = load_info.get("equipment_type", "Unknown")
+                        
+                        embed.add_field(name="📦 Commodity", value=f"{commodity} ({weight})", inline=True)
+                        embed.add_field(name="🚛 Equipment", value=equipment, inline=True)
+                        
                         embed.add_field(name="📊 Readiness Score", value=f"{score}/100", inline=True)
                         
                         risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
