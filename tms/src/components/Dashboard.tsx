@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, AlertCircle, CheckCircle2, Package, MapPin, Truck, Calendar, DollarSign, List, Plus, Trash2 } from 'lucide-react';
+import LiveMap from './LiveMap';
 
 interface Load {
   id: number;
@@ -27,7 +28,6 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
   const [loads, setLoads] = useState<Load[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
-  const [mapLoad, setMapLoad] = useState<Load | null>(null);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return 'TBD';
@@ -151,43 +151,13 @@ export default function Dashboard({ onNavigate: _onNavigate }: { onNavigate?: (t
       </div>
 
       {/* Map Widget */}
-      <div className="card main-widget delay-1">
+      <div className="card main-widget delay-1" style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="widget-header">
           <h3 className="widget-title">Live Dispatch Map</h3>
-          <select 
-            className="map-select"
-            onChange={(e) => {
-              const ld = loads.find(l => l.id.toString() === e.target.value);
-              setMapLoad(ld || null);
-            }}
-            value={mapLoad?.id || ''}
-            style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '13px', background: 'var(--bg-base)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', cursor: 'pointer', outline: 'none' }}
-          >
-            <option value="">Select Load for Map...</option>
-            {activeLoads.map(l => (
-              <option key={l.id} value={l.id}>{l.load_id} ({formatRoute(l)})</option>
-            ))}
-          </select>
+          <span className="status-badge in-transit">Tracking {activeLoads.length} Active Routes</span>
         </div>
-        <div className="map-container" style={{ padding: mapLoad ? 0 : undefined }}>
-          {mapLoad ? (
-            <iframe 
-              width="100%" 
-              height="100%" 
-              frameBorder="0" 
-              scrolling="no" 
-              marginHeight={0} 
-              marginWidth={0} 
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(mapLoad.origin_dest || (mapLoad.origin + ' to ' + mapLoad.destination))}&t=&z=5&ie=UTF8&iwloc=&output=embed`}
-              style={{ filter: 'invert(90%) hue-rotate(180deg) brightness(85%) contrast(85%)', border: 'none' }}
-            ></iframe>
-          ) : (
-            <>
-              <MapPin size={48} className="text-primary" style={{ opacity: 0.5 }} />
-              <p>Select a load to view its route map</p>
-              <span className="status-badge in-transit">Tracking {activeLoads.length} Active Routes</span>
-            </>
-          )}
+        <div className="map-container" style={{ padding: 0, flex: 1, minHeight: '400px', zIndex: 0 }}>
+          <LiveMap />
         </div>
       </div>
 

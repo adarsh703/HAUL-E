@@ -96,3 +96,32 @@ def sync_fleet_from_motive():
         print(f"Motive Sync Error: {e}")
         
     return []
+
+
+def get_vehicle_tracking_raw(unit_id: str):
+    import os
+    import requests
+    api_key = os.getenv("MOTIVE_API_KEY")
+    if not api_key:
+        return None
+        
+    headers = {
+        "X-Api-Key": api_key,
+        "Accept": "application/json"
+    }
+    
+    try:
+        res = requests.get("https://api.keeptruckin.com/v1/vehicle_locations", headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            for v_data in data.get("vehicles", []):
+                v = v_data.get("vehicle", {})
+                if v.get("number") == unit_id:
+                    loc = v.get("current_location")
+                    if not loc:
+                        continue
+                    return loc
+    except Exception as e:
+        print(f"Motive API Error: {e}")
+        
+    return None

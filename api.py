@@ -983,3 +983,98 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
 
+
+
+import json
+import os
+import httpx
+
+GEO_CACHE_FILE = "geo_cache.json"
+
+def get_geo_cache():
+    if os.path.exists(GEO_CACHE_FILE):
+        try:
+            with open(GEO_CACHE_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def save_geo_cache(cache):
+    with open(GEO_CACHE_FILE, "w") as f:
+        json.dump(cache, f)
+
+async def geocode_city(city_str: str):
+    cache = get_geo_cache()
+    if city_str in cache:
+        return cache[city_str]
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": city_str, "format": "json", "limit": 1},
+                headers={"User-Agent": "Haul-E-TMS/1.0"}
+            )
+            if resp.status_code == 200 and resp.json():
+                data = resp.json()[0]
+                res = {"lat": float(data["lat"]), "lon": float(data["lon"])}
+                cache[city_str] = res
+                save_geo_cache(cache)
+                return res
+    except Exception as e:
+        print(f"Geocode error for {city_str}: {e}")
+    
+    # Fallback to center of US if failed
+    res = {"lat": 39.8283, "lon": -98.5795}
+    return res
+
+@app.get("/api/live_map")
+async def get_live_map():
+    from services.motive_service import get_vehicle_tracking_raw
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Load).where(Load.status.in_(["In Transit", "Assigned"])))
+        active_loads = result.scalars().all()
+        
+        result_v = await session.execute(select(Vehicle))
+        db_vehicles = result_v.scalars().all()
+        db_v_dict = {v.driver: v.unit_id for v in db_vehicles if v.driver}
+        
+        routes = []
+        for load in active_loads:
+            if not load.origin or not load.destination:
+                continue
+                
+            origin_geo = await geocode_city(load.origin)
+            dest_geo = await geocode_city(load.destination)
+            
+            truck_geo = None
+            if load.driver and load.driver in db_v_dict:
+                unit_id = db_v_dict[load.driver]
+                truck_data = get_vehicle_tracking_raw(unit_id)
+                if truck_data and truck_data.get("lat") and truck_data.get("lon"):
+                    truck_geo = {
+                        "lat": truck_data["lat"],
+                        "lon": truck_data["lon"],
+                        "description": truck_data.get("description", ""),
+                        "speed": truck_data.get("speed", 0)
+                    }
+            
+            # If no live truck geo, place truck at origin
+            if not truck_geo:
+                truck_geo = {
+                    "lat": origin_geo["lat"],
+                    "lon": origin_geo["lon"],
+                    "description": "Location Unavailable (Idle at Origin)",
+                    "speed": 0
+                }
+                
+            routes.append({
+                "load_id": load.load_id,
+                "driver": load.driver,
+                "origin": {"name": load.origin, "lat": origin_geo["lat"], "lon": origin_geo["lon"]},
+                "destination": {"name": load.destination, "lat": dest_geo["lat"], "lon": dest_geo["lon"]},
+                "truck": truck_geo
+            })
+            
+        return {"routes": routes}
