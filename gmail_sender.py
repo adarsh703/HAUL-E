@@ -90,7 +90,9 @@ def _send_via_smtp(to: str, subject: str, plain_body: str) -> None:
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
     msg["To"] = to
-    msg["Cc"] = GMAIL_USER
+    
+    default_cc = f"{GMAIL_USER}"
+    msg["Cc"] = cc if cc else default_cc
     msg["Reply-To"] = GMAIL_USER
 
     msg.attach(MIMEText(plain_body, "plain", "utf-8"))
@@ -151,7 +153,7 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
     msg["To"] = actual_to
-    msg["Cc"] = f"{GMAIL_USER}, Geetanjlipahil@gmail.com"
+    msg["Cc"] = f"{GMAIL_USER}"
     msg["Reply-To"] = GMAIL_USER
 
     # Attach text body
@@ -215,7 +217,7 @@ def _send_bol_via_smtp(to: str, subject: str, plain_body: str, bol_path: str) ->
     msg["Subject"] = subject
     msg["From"] = f"{COMPANY_NAME} <{GMAIL_USER}>"
     msg["To"] = actual_to
-    msg["Cc"] = f"{GMAIL_USER}, Geetanjlipahil@gmail.com"
+    msg["Cc"] = f"{GMAIL_USER}"
     msg["Reply-To"] = GMAIL_USER
 
     text_part = MIMEMultipart("alternative")
