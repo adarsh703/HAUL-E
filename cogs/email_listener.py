@@ -30,6 +30,7 @@ _VERTEX_SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 class EmailListener(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.allowed_channel = int(os.getenv("ALLOWED_CHANNEL_ID", "1512055979259334730"))
         creds_file = os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE", "google_credentials.json")
         from google.oauth2 import service_account
         creds = service_account.Credentials.from_service_account_file(
@@ -247,7 +248,7 @@ Email Body Context:
                     try:
                         from cogs.document_ocr import LoadConfirmView
                         
-                        LOAD_CREATION_CHANNEL_ID = 1512055979259334730
+                        LOAD_CREATION_CHANNEL_ID = self.allowed_channel
                         confirmation_channel = self.bot.get_channel(LOAD_CREATION_CHANNEL_ID)
                         
                         if confirmation_channel:
@@ -361,7 +362,29 @@ Email Body Context:
                         results.append((sender, subject, body, attachments))
         except Exception as e:
             log.error(f"IMAP fetch error: {e}")
+
         return results
+
+    @discord.app_commands.command(name="force_email_check", description="Force check the inbox for new Rate Confirmations.")
+    async def force_email_check(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            results = await asyncio.to_thread(self._sync_fetch_unread_emails)
+            if not results:
+                await interaction.followup.send("📭 No unread emails found in the inbox.")
+                return
+            
+            summary = []
+            for sender, subject, body, attachments in results:
+                summary.append(f"- From: **{sender}** | Subject: *{subject}* | Attachments: {len(attachments)}")
+                
+            msg = "📬 **Force Check Found Emails:**\n" + "\n".join(summary) + "\n\n(Processing them now...)"
+            await interaction.followup.send(msg)
+            
+            # Now trigger the background loop once manually to process them
+            await self.check_emails()
+        except Exception as e:
+            await interaction.followup.send(f"❌ Error checking emails: {e}")
 
 
 async def setup(bot: commands.Bot):
