@@ -91,6 +91,9 @@ class BrokerBot(commands.Bot):
                 name="/sendmail"
             )
         )
+        # Initialize temp checker with bot instance
+        from services.temp_checker import init_temp_checker
+        init_temp_checker(self)
 
 client = BrokerBot()
 

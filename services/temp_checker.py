@@ -1,317 +1,211 @@
 """
-temp_checker.py — APScheduler-based Temperature Check-In Service
+temp_checker.py — Discord-native Temperature Check-In Service
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Manages recurring temperature check SMS messages to drivers for active reefer
-loads.  Each load gets its own APScheduler interval job, keyed by load_id.
+Manages recurring temperature check messages to drivers for active reefer loads.
+Uses a simple in-memory tracker + discord bot loop instead of APScheduler to
+avoid event loop issues.
 
 Public API:
-  start_temp_checks(load_id, driver_phone, interval_hours=3)
+  start_temp_checks(load_id, driver_phone, interval_minutes=180)
   stop_temp_checks(load_id)
   get_active_checks()
-
-Sends messages through services.twilio_sms.send_temp_check().
+  init_temp_checker(bot) — call once at bot startup
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
 import logging
-from typing import List, Dict, Any
-
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.base import JobLookupError
-
-from services.twilio_sms import send_temp_check
+import asyncio
+import discord
+from discord.ext import tasks
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
 
 log = logging.getLogger("broker_bot.temp_checker")
 
-# ── Module-Level Scheduler Singleton ──────────────────────────────────────────
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-jobstores = {
-    'default': SQLAlchemyJobStore(url='sqlite:///apscheduler_jobs.sqlite')
-}
-_scheduler: AsyncIOScheduler = AsyncIOScheduler(jobstores=jobstores)
-
-# Prefix used for all temp-check job IDs so they don't collide with other jobs.
-_JOB_ID_PREFIX = "temp_check_"
+# ── In-Memory Active Checks ──────────────────────────────────────────────────
+# { load_id: { "driver_phone": str, "interval_minutes": int, "last_sent": datetime, "next_send": datetime } }
+_active_checks: Dict[str, Dict[str, Any]] = {}
+_bot = None  # Set via init_temp_checker
 
 
-def _build_job_id(load_id: str) -> str:
-    """Returns a deterministic scheduler job ID for a given load."""
-    return f"{_JOB_ID_PREFIX}{load_id}"
+def init_temp_checker(bot):
+    """Call this once at bot startup to give the temp checker access to the bot."""
+    global _bot
+    _bot = bot
+    _start_loop()
+    log.info("✅ Temp checker initialized")
 
 
-def _build_temp_check_message(load_id: str) -> str:
-    """Builds the SMS body sent to the driver for a temperature check-in."""
-    return (
-        f"🌡️ HAUL-E Temp Check — Load {load_id}\n"
-        f"Please confirm: Is the temperature correct? "
-        f"Reply YES or NO with current reading."
-    )
+def _start_loop():
+    """Start the background loop that checks every minute."""
+    if not _temp_loop.is_running():
+        _temp_loop.start()
 
 
-# ── Scheduled Callback ───────────────────────────────────────────────────────
+@tasks.loop(minutes=1)
+async def _temp_loop():
+    """Runs every minute, checks if any temp checks are due."""
+    if not _active_checks:
+        return
 
-async def _send_temp_check_sms(load_id: str, driver_phone: str) -> None:
-    """
-    Callback executed by the scheduler on each interval tick.
-    Sends a temp-check Discord message to the driver's thread.
-    """
+    now = datetime.now(timezone.utc)
+    
+    for load_id, info in list(_active_checks.items()):
+        # Check if due for a new message
+        if now >= info["next_send"]:
+            await _send_temp_check(load_id, info["driver_phone"])
+            info["last_sent"] = now
+            info["next_send"] = now + timedelta(minutes=info["interval_minutes"])
+            info["awaiting_response"] = True
+            info["last_check_sent"] = now
+            
+        # Check if waiting for response for more than 15 mins
+        if info.get("awaiting_response") and info.get("last_check_sent"):
+            if now >= info["last_check_sent"] + timedelta(minutes=15):
+                info["awaiting_response"] = False
+                log.warning("No temp response for Load %s after 15m. Sending email.", load_id)
+                import os
+                notify_email = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
+                try:
+                    from services.twilio_sms import forward_no_response_email
+                    asyncio.create_task(forward_no_response_email(notify_email, load_id))
+                except Exception as e:
+                    log.error(f"Failed to trigger no response email: {e}")
+
+
+async def _send_temp_check(load_id: str, driver_phone: str) -> None:
+    """Send a temp check message to the driver's Discord thread."""
+    if not _bot:
+        log.warning("Bot not initialized for temp checker")
+        return
+
     from database.models import AsyncSessionLocal, Load
     from sqlalchemy.future import select
-    
+
     try:
-        # 1. Fetch the thread ID from the DB
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(Load).where(Load.load_id == load_id))
             load = result.scalars().first()
             if not load or not load.discord_thread_id:
-                log.warning("No Discord thread found for load %s to send temp check.", load_id)
+                log.warning("No Discord thread found for load %s — stopping temp checks.", load_id)
+                _active_checks.pop(load_id, None)
                 return
-                
+
+            # Stop if load is no longer in transit
+            if load.status not in ('In Transit', 'Assigned', 'Dispatched'):
+                log.info("Load %s is '%s' — stopping temp checks.", load_id, load.status)
+                _active_checks.pop(load_id, None)
+                return
+
             thread_id = int(load.discord_thread_id)
 
-        # 2. Get the thread and send the message via the main bot client
-        from main import client
-        import discord
-        thread = client.get_channel(thread_id)
+        thread = _bot.get_channel(thread_id)
         if not thread:
-            # Maybe it's a thread we haven't fetched yet
             try:
-                thread = await client.fetch_channel(thread_id)
+                thread = await _bot.fetch_channel(thread_id)
             except discord.NotFound:
                 log.warning("Could not find Discord thread %s for load %s", thread_id, load_id)
+                _active_checks.pop(load_id, None)
                 return
-                
+
         await thread.send(
             f"🌡️ **HAUL-E Temp Check — Load {load_id}**\n"
-            f"Please confirm: Is the temperature correct? "
-            f"Reply YES or NO with current reading."
+            f"What is your current reefer temperature reading?"
         )
-        log.info("🌡️  Temp check sent to Discord thread | Load: %s", load_id)
-        
-        # Schedule 15 minute timeout check
-        from datetime import datetime, timedelta
-        import pytz
-        import uuid
-        now_utc = datetime.now(pytz.utc)
-        
-        if not _scheduler.running:
-            _scheduler.start()
-            
-        _scheduler.add_job(
-            _check_temp_timeout,
-            trigger="date",
-            run_date=datetime.now() + timedelta(minutes=15),
-            args=[load_id, now_utc],
-            id=f"timeout_{load_id}_{uuid.uuid4().hex[:8]}"
-        )
-    except Exception:
-        log.exception(
-            "❌ Failed to send temp check | Load: %s | Driver: %s",
-            load_id,
-            driver_phone,
-        )
+        log.info("🌡️  Temp check sent to thread | Load: %s", load_id)
 
-async def _check_temp_timeout(load_id: str, sent_time_utc) -> None:
-    from database.session import get_db_session
-    from database.models import Load, TempCheckLog
-    from sqlalchemy import select
-    from services.motive_service import get_vehicle_tracking
-    from services.twilio_sms import forward_temp_response_email
-    import asyncio
-    
-    try:
-        async with get_db_session() as session:
-            load = (await session.execute(select(Load).where(Load.load_id == load_id))).scalars().first()
-            if not load or load.status not in ["In Transit", "Dispatched"]:
-                return
-                
-            recent_log = (await session.execute(
-                select(TempCheckLog)
-                .where(TempCheckLog.load_id == load_id)
-                .where(TempCheckLog.timestamp > sent_time_utc.replace(tzinfo=None))
-            )).scalars().first()
-            
-            if not recent_log:
-                # Driver didn't respond!
-                tracking = await asyncio.to_thread(get_vehicle_tracking, load.driver)
-                eta_str = "Unknown"
-                if tracking:
-                    eta_str = f"{tracking.get('eta_time', 'Unknown')} ({tracking.get('distance_to_destination', 'Unknown')} left)"
-                
-                msg_body = "No response by driver as he is off duty."
-                if eta_str != "Unknown":
-                    msg_body += f"\n\nCurrent Motive ETA: {eta_str}"
-                    
-                if load.shipper_email:
-                    await forward_temp_response_email(load.shipper_email, load.load_id, msg_body, is_issue=True)
-                elif load.broker_email:
-                    await forward_temp_response_email(load.broker_email, load.load_id, msg_body, is_issue=True)
-                    
-                log.info(f"Driver timeout reached for {load_id}. Emailed shipper.")
-    except Exception as e:
-        log.error(f"Failed to process driver timeout for {load_id}: {e}")
-
-async def _send_silent_location_update(load_id: str, shipper_email: str) -> None:
-    try:
-        from services.twilio_sms import forward_location_email
-        await forward_location_email(shipper_email, load_id)
-        log.info(f"📍 Silent tracking check triggered | Load: {load_id}")
     except Exception:
-        log.exception(f"❌ Failed to trigger silent tracking | Load: {load_id}")
+        log.exception("❌ Failed to send temp check | Load: %s", load_id)
+
 
 # ── Public API ────────────────────────────────────────────────────────────────
-
-async def start_location_checks(
-    load_id: str,
-    shipper_email: str,
-    interval_minutes: int = 180,
-) -> None:
-    job_id = _build_job_id(load_id) # Using same prefix so stop_temp_checks works for both
-    
-    if not _scheduler.running:
-        _scheduler.start()
-        
-    _scheduler.add_job(
-        _send_silent_location_update,
-        trigger="interval",
-        minutes=interval_minutes,
-        id=job_id,
-        replace_existing=True,
-        args=[load_id, shipper_email],
-        name=f"Tracking update — Load {load_id}",
-    )
-    log.info(f"📍 Tracking checks started | Load: {load_id} | Every {interval_minutes}m")
-    await _send_silent_location_update(load_id, shipper_email)
 
 async def start_temp_checks(
     load_id: str,
     driver_phone: str,
-    interval_minutes: int = 1,
+    interval_minutes: int = 180,
 ) -> None:
     """
-    Start recurring temperature check-in SMS for a load.
+    Start recurring temperature check-ins for a load.
 
     Args:
-        load_id:          Unique load identifier (e.g. "MOR-12345").
-        driver_phone:     Driver's phone number in E.164 format (e.g. "+15551234567").
-        interval_minutes: Minutes between each check-in SMS. Defaults to 1 for testing.
-
-    If a job already exists for this load_id it is replaced so the interval
-    or phone number can be updated without a separate stop call.
+        load_id:          Unique load identifier.
+        driver_phone:     Driver's phone number (kept for reference).
+        interval_minutes: Minutes between each check. Defaults to 180 (3 hours).
     """
-    job_id = _build_job_id(load_id)
+    now = datetime.now(timezone.utc)
 
-    # Ensure the scheduler is running (idempotent after the first call).
-    if not _scheduler.running:
-        _scheduler.start()
-        log.info("✅ Temp-check scheduler started")
-
-    _scheduler.add_job(
-        _send_temp_check_sms,
-        trigger="interval",
-        minutes=interval_minutes,
-        id=job_id,
-        replace_existing=True,
-        args=[load_id, driver_phone],
-        name=f"Temp check — Load {load_id}",
-        misfire_grace_time=3600,
-    )
+    _active_checks[load_id] = {
+        "driver_phone": driver_phone,
+        "interval_minutes": interval_minutes,
+        "last_sent": now,
+        "next_send": now + timedelta(minutes=interval_minutes),
+    }
 
     log.info(
-        "🌡️  Temp checks started | Load: %s | Driver: %s | Every %dm",
+        "🌡️  Temp checks started | Load: %s | Every %dm",
         load_id,
-        driver_phone,
         interval_minutes,
     )
 
-    # Fire the first check immediately so the driver isn't waiting N hours.
-    await _send_temp_check_sms(load_id, driver_phone)
+    # Ensure loop is running
+    _start_loop()
+
+    # Fire the first check immediately
+    await _send_temp_check(load_id, driver_phone)
 
 
 async def stop_temp_checks(load_id: str) -> None:
-    """
-    Stop recurring temperature check-in SMS for a delivered/cancelled load.
-
-    Args:
-        load_id: The load whose temp-check job should be removed.
-
-    Silently succeeds if no job exists for the given load_id.
-    """
-    job_id = _build_job_id(load_id)
-    try:
-        _scheduler.remove_job(job_id)
+    """Stop recurring temperature checks for a load."""
+    removed = _active_checks.pop(load_id, None)
+    if removed:
         log.info("🛑 Temp checks stopped | Load: %s", load_id)
-    except JobLookupError:
-        log.warning(
-            "⚠️  No active temp-check job found for Load: %s (already stopped?)",
-            load_id,
-        )
+    else:
+        log.warning("⚠️  No active temp checks for Load: %s (already stopped?)", load_id)
+
+def mark_temp_responded(load_id: str) -> None:
+    """Mark that the driver responded to the temp check."""
+    if load_id in _active_checks:
+        _active_checks[load_id]["awaiting_response"] = False
+        log.info("✅ Marked temp check as responded for Load %s", load_id)
+
+def update_temp_interval(load_id: str, new_interval_minutes: int) -> bool:
+    """Update the interval for an active temp check."""
+    if load_id in _active_checks:
+        info = _active_checks[load_id]
+        info["interval_minutes"] = new_interval_minutes
+        info["next_send"] = info["last_sent"] + timedelta(minutes=new_interval_minutes)
+        log.info(f"⏱️ Updated temp check interval for {load_id} to {new_interval_minutes}m")
+        return True
+    return False
 
 
 def get_active_checks() -> List[Dict[str, Any]]:
-    """
-    Returns a list of all currently active temp-check jobs.
-
-    Each entry is a dict with:
-        load_id         — The load identifier.
-        driver_phone    — The driver's phone number.
-        interval_hours  — Hours between SMS messages.
-        next_run        — Next scheduled execution time (ISO 8601 string or None).
-    """
-    active: List[Dict[str, Any]] = []
-
-    for job in _scheduler.get_jobs():
-        if not job.id.startswith(_JOB_ID_PREFIX):
-            continue
-
-        load_id = job.args[0] if job.args else job.id.removeprefix(_JOB_ID_PREFIX)
-        driver_phone = job.args[1] if job.args and len(job.args) > 1 else "unknown"
-
-        # Extract interval minutes from the trigger.
-        interval_minutes = None
-        if hasattr(job.trigger, "interval"):
-            interval_minutes = int(job.trigger.interval.total_seconds() // 60)
-
+    """Returns a list of all currently active temp-check jobs."""
+    active = []
+    for load_id, info in _active_checks.items():
         active.append({
             "load_id": load_id,
-            "driver_phone": driver_phone,
-            "interval_minutes": interval_minutes,
-            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "driver_phone": info["driver_phone"],
+            "interval_minutes": info["interval_minutes"],
+            "next_run": info["next_send"].isoformat(),
         })
-
     return active
 
-# ── Delivery Check Scheduling ────────────────────────────────────────────────
 
-async def _send_delivery_check_sms(load_id: str, driver_phone: str) -> None:
-    """
-    Callback executed when the expected delivery time is reached.
-    """
-    try:
-        from services.twilio_sms import _send_whatsapp_sync
-        import asyncio
-        msg = f"📍 HAUL-E Delivery Check — Load {load_id}\n\nHave you completed the delivery? Please reply 'Delivered' when empty, or let us know if there are any delays."
-        await asyncio.to_thread(_send_whatsapp_sync, driver_phone, msg)
-        log.info(f"📍 Delivery check sent | Load: {load_id} | Driver: {driver_phone}")
-    except Exception:
-        log.exception(f"❌ Failed to send delivery check | Load: {load_id} | Driver: {driver_phone}")
+# ── Stubs for Legacy API ──────────────────────────────────────────────────────
+class _DummyScheduler:
+    running = True
+    def start(self): pass
+    def get_job(self, job_id): return None
 
-def schedule_delivery_check(load_id: str, driver_phone: str, run_date) -> None:
-    """
-    Schedule a one-time message to check if the driver has delivered.
-    """
-    job_id = f"delivery_check_{load_id}"
-    
-    if not _scheduler.running:
-        _scheduler.start()
-        
-    _scheduler.add_job(
-        _send_delivery_check_sms,
-        trigger="date",
-        run_date=run_date,
-        id=job_id,
-        replace_existing=True,
-        args=[load_id, driver_phone],
-        name=f"Delivery check — Load {load_id}",
-    )
-    log.info(f"📍 Scheduled delivery check | Load: {load_id} | Time: {run_date}")
+_scheduler = _DummyScheduler()
+
+async def start_location_checks(load_id: str, shipper_email: str, interval_minutes: int = 180):
+    log.info(f"📍 Location checks stub called for {load_id}")
+
+async def stop_location_checks(load_id: str):
+    pass
+
+def schedule_delivery_check(load_id: str, driver_phone: str, run_date):
+    log.info(f"📍 Delivery check stub scheduled for {load_id} at {run_date}")

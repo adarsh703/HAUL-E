@@ -909,6 +909,16 @@ Respond with exactly one word: 'OK' or 'ISSUE'.
                     else:
                         from services.temp_checker import stop_location_checks
                         stop_location_checks(load.load_id)
+                        
+                    # Trigger invoice generation and approval flow via Discord
+                    from database.models import OperationalTask
+                    task = OperationalTask(
+                        task_type="INVOICE_APPROVAL",
+                        reference_id=load.load_id,
+                        description=f"Approve Invoice for Load {load.load_id}",
+                        status="PENDING"
+                    )
+                    session.add(task)
                 else:
                     missing = []
                     if not load.bol_path: missing.append("BOL")

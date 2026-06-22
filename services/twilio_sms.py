@@ -20,6 +20,9 @@ import os
 import asyncio
 import logging
 from datetime import datetime
+import pytz
+
+TORONTO_TZ = pytz.timezone('America/Toronto')
 
 from dotenv import load_dotenv
 from twilio.rest import Client
@@ -278,6 +281,9 @@ async def forward_temp_response_email(
     load_id: str,
     driver_response: str,
     is_issue: bool = False,
+    is_out_of_range: bool = False,
+    required_temp_num: float = None,
+    reported_temp_num: float = None,
 ) -> None:
     """
     Forward the driver's temperature response to the shipper via email.
@@ -291,12 +297,15 @@ async def forward_temp_response_email(
     """
     from gmail_sender import _send_via_smtp
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p")
 
     # Determine if temp is correct or there's an issue
-    if is_issue:
+    if is_out_of_range:
+        status = "❌ OUT OF RANGE"
+        status_line = f"The driver reported a temperature of {reported_temp_num}°F, which is out of range from the required {required_temp_num}°F. Please call the driver immediately to correct the temperature!"
+    elif is_issue:
         status = "⚠️ ISSUE REPORTED"
-        status_line = "The driver has reported a temperature issue or the reading is out of range. Please call the driver immediately to correct the temperature!"
+        status_line = "The driver has reported a temperature issue. Please call the driver immediately to correct the temperature!"
     else:
         status = "✅ TEMPERATURE CONFIRMED CORRECT"
         status_line = "The driver has confirmed that the temperature in the truck is correct and within the required range."
@@ -337,10 +346,10 @@ async def forward_temp_response_email(
                         location_str = f"{tracking['location']} ({tracking['speed']} mph)"
                         
                         # Mock dynamic ETA based on location
-                        from datetime import datetime, timedelta
+                        from datetime import timedelta
                         import random
                         hours_away = random.randint(4, 18)
-                        eta_time = datetime.now() + timedelta(hours=hours_away)
+                        eta_time = datetime.now(TORONTO_TZ) + timedelta(hours=hours_away)
                         eta_str = eta_time.strftime("%A at %I:%00 %p")
                         
                         on_time_str = f"Estimated Arrival: {eta_str} (On Time - {'Driving' if tracking['speed'] > 0 else 'Idle'})"
@@ -349,21 +358,16 @@ async def forward_temp_response_email(
 
     subject = f"🌡️ {status} — Load #{load_id} | {COMPANY_NAME}"
     body = (
-        f"Temperature & Location Update\n"
-        f"{'=' * 40}\n"
-        f"\n"
-        f"Load #:    {load_id}\n"
-        f"Time:      {timestamp}\n"
-        f"Status:    {status}\n"
-        f"Location:  {location_str}\n"
-        f"ETA State: {on_time_str}\n"
-        f"\n"
-        f"{status_line}\n"
-        f"\n"
-        f"Driver's response: \"{driver_response}\"\n"
-        f"\n"
-        f"{'=' * 40}\n"
-        f"This is an automated temperature and tracking report from {COMPANY_NAME}.\n"
+        f"Hello,\n\n"
+        f"Please find the latest temperature and location update for Load #{load_id} below:\n\n"
+        f"• Status: {status}\n"
+        f"• Current Location: {location_str}\n"
+        f"• ETA Status: {on_time_str}\n"
+        f"• Time of Report: {timestamp}\n\n"
+        f"{status_line}\n\n"
+        f"Driver's Exact Response: \"{driver_response}\"\n\n"
+        f"Thank you,\n"
+        f"{COMPANY_NAME} Dispatch\n"
     )
 
     log.info("Forwarding temp response → %s | Load #%s | %s", shipper_email, load_id, status)
@@ -378,7 +382,7 @@ async def forward_location_email(shipper_email: str, load_id: str) -> None:
     from sqlalchemy.future import select
     from services.motive_service import sync_fleet_from_motive, get_vehicle_tracking
     
-    timestamp = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p")
     location_str = "Location unavailable"
     on_time_str = "Estimated On Time"
     
@@ -414,16 +418,13 @@ async def forward_location_email(shipper_email: str, load_id: str) -> None:
 
     subject = f"📍 Tracking Update — Load #{load_id} | {COMPANY_NAME}"
     body = (
-        f"Automated Tracking Update\n"
-        f"{'=' * 40}\n"
-        f"\n"
-        f"Load #:    {load_id}\n"
-        f"Time:      {timestamp}\n"
-        f"Location:  {location_str}\n"
-        f"ETA State: {on_time_str}\n"
-        f"\n"
-        f"{'=' * 40}\n"
-        f"This is an automated tracking report from {COMPANY_NAME}.\n"
+        f"Hello,\n\n"
+        f"Please find the latest automated tracking update for Load #{load_id} below:\n\n"
+        f"• Current Location: {location_str}\n"
+        f"• ETA Status: {on_time_str}\n"
+        f"• Time of Report: {timestamp}\n\n"
+        f"Thank you,\n"
+        f"{COMPANY_NAME} Dispatch\n"
     )
 
     log.info("Forwarding silent location update → %s | Load #%s", shipper_email, load_id)
@@ -449,7 +450,7 @@ async def forward_temp_response_whatsapp(
     Returns:
         Twilio Message SID.
     """
-    timestamp = datetime.now().strftime("%I:%M %p")
+    timestamp = datetime.now(TORONTO_TZ).strftime("%I:%M %p")
 
     # Determine if temp is correct or there's an issue
     if is_issue:
@@ -473,3 +474,135 @@ async def forward_temp_response_whatsapp(
              dispatcher_phone, load_id)
     return await asyncio.to_thread(_send_whatsapp_sync, dispatcher_phone, body)
 
+
+async def forward_no_response_email(shipper_email: str, load_id: str) -> None:
+    from gmail_sender import _send_via_smtp
+    from database.models import Load
+    from api import get_db_session
+    from sqlalchemy.future import select
+    from services.motive_service import sync_fleet_from_motive, get_vehicle_tracking
+    
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p")
+    location_str = "Location unavailable"
+    on_time_str = "Estimated On Time"
+    
+    try:
+        async with get_db_session() as session:
+            result = await session.execute(select(Load).where(Load.load_id == load_id))
+            load = result.scalars().first()
+            if load:
+                import json
+                vehicles = await asyncio.to_thread(sync_fleet_from_motive)
+                unit_id = None
+                
+                if load.operational_intelligence:
+                    try:
+                        intel = json.loads(load.operational_intelligence)
+                        truck = intel.get("load_information", {}).get("assigned_truck", "")
+                        if truck:
+                            truck_clean = truck.replace("#", "").strip().lower()
+                            unit_id = next((v["unit_id"] for v in vehicles if v["unit_id"].lower() == truck_clean), None)
+                    except Exception:
+                        pass
+                
+                if not unit_id and load.driver:
+                    unit_id = next((v["unit_id"] for v in vehicles if v["driver"].lower() == load.driver.lower()), None)
+                    
+                if unit_id:
+                    tracking = await asyncio.to_thread(get_vehicle_tracking, unit_id)
+                    if tracking:
+                        location_str = f"{tracking['location']} ({tracking['speed']} mph)"
+                        
+                        from datetime import timedelta
+                        import random
+                        hours_away = random.randint(4, 18)
+                        eta_time = datetime.now(TORONTO_TZ) + timedelta(hours=hours_away)
+                        eta_str = eta_time.strftime("%A at %I:%00 %p")
+                        
+                        on_time_str = f"Estimated Arrival: {eta_str} (On Time - {'Driving' if tracking['speed'] > 0 else 'Idle'})"
+    except Exception as e:
+        log.error(f"Failed to fetch Motive location for no response email: {e}")
+
+    subject = f"⚠️ No Response to Temp Check — Load #{load_id} | {COMPANY_NAME}"
+    body = (
+        f"Hello,\n\n"
+        f"Please find the latest tracking and ETA update for Load #{load_id} below. "
+        f"Please note that the driver did not respond to our recent temperature check.\n\n"
+        f"• Status: No Response From Driver\n"
+        f"• Current Location: {location_str}\n"
+        f"• ETA Status: {on_time_str}\n"
+        f"• Time of Report: {timestamp}\n\n"
+        f"We will continue to monitor the load and will provide further updates as they become available.\n\n"
+        f"Thank you,\n"
+        f"{COMPANY_NAME} Dispatch\n"
+    )
+
+    log.info("Forwarding no response location update → %s | Load #%s", shipper_email, load_id)
+    notify_email = os.getenv('GMAIL_USER', 'cavemann177@gmail.com')
+    await asyncio.to_thread(_send_via_smtp, notify_email, subject, body)
+
+async def forward_issue_email(shipper_email: str, load_id: str, driver_message: str) -> None:
+    from gmail_sender import _send_via_smtp
+    from database.models import Load
+    from api import get_db_session
+    from sqlalchemy.future import select
+    from services.motive_service import sync_fleet_from_motive, get_vehicle_tracking
+    
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p")
+    location_str = "Location unavailable"
+    on_time_str = "Estimated On Time"
+    
+    try:
+        async with get_db_session() as session:
+            result = await session.execute(select(Load).where(Load.load_id == load_id))
+            load = result.scalars().first()
+            if load:
+                import json
+                vehicles = await asyncio.to_thread(sync_fleet_from_motive)
+                unit_id = None
+                
+                if load.operational_intelligence:
+                    try:
+                        intel = json.loads(load.operational_intelligence)
+                        truck = intel.get("load_information", {}).get("assigned_truck", "")
+                        if truck:
+                            truck_clean = truck.replace("#", "").strip().lower()
+                            unit_id = next((v["unit_id"] for v in vehicles if v["unit_id"].lower() == truck_clean), None)
+                    except Exception:
+                        pass
+                
+                if not unit_id and load.driver:
+                    unit_id = next((v["unit_id"] for v in vehicles if v["driver"].lower() == load.driver.lower()), None)
+                    
+                if unit_id:
+                    tracking = await asyncio.to_thread(get_vehicle_tracking, unit_id)
+                    if tracking:
+                        location_str = f"{tracking['location']} ({tracking['speed']} mph)"
+                        
+                        from datetime import timedelta
+                        import random
+                        hours_away = random.randint(4, 18)
+                        eta_time = datetime.now(TORONTO_TZ) + timedelta(hours=hours_away)
+                        eta_str = eta_time.strftime("%A at %I:%00 %p")
+                        
+                        on_time_str = f"Estimated Arrival: {eta_str} (On Time - {'Driving' if tracking['speed'] > 0 else 'Idle'})"
+    except Exception as e:
+        log.error(f"Failed to fetch Motive location for issue email: {e}")
+
+    subject = f"🚨 GENERAL ISSUE REPORTED — Load #{load_id} | {COMPANY_NAME}"
+    body = (
+        f"Hello,\n\n"
+        f"The driver for Load #{load_id} has reported a general issue that requires your immediate attention.\n\n"
+        f"• Status: 🚨 ISSUE REPORTED\n"
+        f"• Current Location: {location_str}\n"
+        f"• ETA Status: {on_time_str}\n"
+        f"• Time of Report: {timestamp}\n\n"
+        f"Driver's Message: \"{driver_message}\"\n\n"
+        f"Please contact the driver as soon as possible to resolve this.\n\n"
+        f"Thank you,\n"
+        f"{COMPANY_NAME} Dispatch\n"
+    )
+
+    log.info("Forwarding general issue update → %s | Load #%s", shipper_email, load_id)
+    notify_email = os.getenv('GMAIL_USER', 'cavemann177@gmail.com')
+    await asyncio.to_thread(_send_via_smtp, notify_email, subject, body)

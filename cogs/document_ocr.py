@@ -188,10 +188,9 @@ class LoadConfirmView(discord.ui.View):
                         load.discord_thread_id = str(thread.id)
                         await session.commit()
 
-                # Construct Plaintext Dispatch Message
+                # Construct Driver Dispatch Embed
                 driver_name = assigned_driver if assigned_driver else "Unassigned"
                 truck_number = "Unknown"
-                trailer_number = "Unknown"
                 
                 if assigned_driver and assigned_driver != "Unassigned":
                     from database.models import Vehicle
@@ -202,11 +201,11 @@ class LoadConfirmView(discord.ui.View):
                         if vehicle:
                             truck_number = vehicle.unit_id
 
-                message_lines = [
-                    f"🚚 **NEW DISPATCH: Load #{self.load_id_val}**",
-                    f"**Driver:** {driver_name.upper()}  |  **Truck:** {truck_number}",
-                    ""
-                ]
+                driver_embed = discord.Embed(
+                    title=f"🚚 NEW DISPATCH: Load {self.load_id_val}",
+                    color=0x2b7de9,
+                    description=f"**Driver:** {driver_name.upper()}  |  **Truck:** {truck_number}"
+                )
                 
                 stops = self.load_data.get('stops', [])
                 for i, stop in enumerate(stops):
@@ -227,36 +226,85 @@ class LoadConfirmView(discord.ui.View):
                     emoji = "📍" if "Pick" in stop_type else "🏁"
                     num_label = "PU Number" if "Pick" in stop_type else "DO Number"
                     
-                    message_lines.append(f"{emoji} **STOP {i+1}: {stop_type.upper()}**")
-                    message_lines.append(f"**Name:** {company}")
-                    message_lines.append(f"**Address:** {address_full}")
-                    message_lines.append(f"**Phone:** {phone}")
-                    message_lines.append(f"**{num_label}:** {ref_str}")
-                    message_lines.append(f"**Appt:** {appt}")
+                    stop_lines = [
+                        f"**Name:** {company}",
+                        f"**Address:** {address_full}",
+                        f"**Phone:** {phone}",
+                        f"**{num_label}:** {ref_str}",
+                        f"**Appt:** {appt}",
+                    ]
                     if instructions and instructions.lower() != 'none':
-                        message_lines.append(f"*Note: {instructions}*")
-                    message_lines.append("")
+                        stop_lines.append(f"*Note: {instructions}*")
+                    
+                    stop_value = "\n".join(stop_lines)
+                    # Truncate to Discord's 1024 char field limit
+                    if len(stop_value) > 1024:
+                        stop_value = stop_value[:1021] + "..."
+                    driver_embed.add_field(
+                        name=f"{emoji} STOP {i+1}: {stop_type.upper()}",
+                        value=stop_value,
+                        inline=False
+                    )
                     
                 ops_intel = self.load_data.get('operational_intelligence', {})
                 alerts = ops_intel.get('alerts', [])
                 
-                # Check for temperature requirements to add as alert
+                # --- Dedicated Temperature Requirements Field ---
                 load_info = self.load_data.get('load_information', {})
                 reefer = self.load_data.get('reefer_operations', {})
-                temp = reefer.get('temperature_setpoint') or load_info.get('temperature_requirements')
-                if temp and temp.lower() != 'n/a':
-                    alerts.insert(0, f"Temperature Setpoint: {temp}")
-                    
+                temp_setpoint = reefer.get('temperature_setpoint') or ''
+                temp_range = reefer.get('temperature_range') or ''
+                temp_general = load_info.get('temperature_requirements') or ''
+                continuous = reefer.get('continuous_mode', False)
+                precool = reefer.get('pre_cool_required', False)
+                
+                temp_lines = []
+                if temp_setpoint and temp_setpoint.lower() != 'n/a':
+                    temp_lines.append(f"🎯 **Setpoint:** {temp_setpoint}")
+                if temp_range and temp_range.lower() != 'n/a':
+                    temp_lines.append(f"📏 **Range:** {temp_range}")
+                if temp_general and temp_general.lower() != 'n/a' and temp_general != temp_setpoint:
+                    temp_lines.append(f"📋 **Requirement:** {temp_general}")
+                if continuous:
+                    temp_lines.append("🔄 **Mode:** Continuous")
+                if precool:
+                    temp_lines.append("❄️ **Pre-Cool:** Required")
+                
+                if temp_lines:
+                    driver_embed.add_field(
+                        name="🌡️ TEMPERATURE REQUIREMENTS",
+                        value="\n".join(temp_lines),
+                        inline=False
+                    )
+                    # Remove any temp-related alerts to avoid duplication
+                    alerts = [a for a in alerts if 'temperature' not in a.lower() and 'temp ' not in a.lower() and 'reefer' not in a.lower()]
+                
                 if alerts:
-                    message_lines.append("⚠️ **EXTRA REQUIREMENTS:**")
-                    for alert in alerts:
-                        message_lines.append(f"• {alert}")
-                    message_lines.append("")
+                    # Split into multiple fields if needed (1024 char limit per field)
+                    chunk = ""
+                    chunk_idx = 1
+                    for a in alerts:
+                        alert_str = f"⚠️ {a}\n"
+                        if len(chunk) + len(alert_str) > 1024:
+                            name = "🚨 Extra Requirements" if chunk_idx == 1 else f"🚨 Extra Requirements (Cont.)"
+                            driver_embed.add_field(name=name, value=chunk.strip(), inline=False)
+                            chunk = alert_str
+                            chunk_idx += 1
+                        else:
+                            chunk += alert_str
+                    if chunk:
+                        name = "🚨 Extra Requirements" if chunk_idx == 1 else f"🚨 Extra Requirements (Cont.)"
+                        driver_embed.add_field(name=name, value=chunk.strip(), inline=False)
                 
-                message_lines.append("👉 **Reply `OK` to confirm receipt!**")
+                driver_embed.set_footer(text="📄 Send BOL when loaded  •  📄 Send POD when delivered")
                 
-                dispatch_text = "\n".join(message_lines)
-                await thread.send(dispatch_text)
+                try:
+                    await thread.send(embed=driver_embed)
+                except Exception as send_err:
+                    log.error(f"Failed to send driver embed in thread {thread.id}: {send_err}", exc_info=True)
+                    # Fallback: send as plain text if embed somehow fails
+                    fallback = f"🚚 **DISPATCH: Load {self.load_id_val}**\n**Driver:** {driver_name} | **Truck:** {truck_number}\n📄 Send BOL when loaded • Send POD when delivered"
+                    await thread.send(fallback[:2000])
                 
                 # --- AUTO DISPATCH LOGIC ---
                 if self.selected_driver == 'Unassigned':
@@ -591,6 +639,35 @@ Extract data directly from the attached document.
                         
                         risk_emoji = "🟢" if risk == "Low" else "🟡" if risk == "Medium" else "🔴"
                         embed.add_field(name="⚠️ Risk Level", value=f"{risk_emoji} {risk}", inline=True)
+                        
+                        # --- Dedicated Temperature Requirements Field ---
+                        reefer = load_data.get('reefer_operations', {})
+                        temp_setpoint = reefer.get('temperature_setpoint') or ''
+                        temp_range = reefer.get('temperature_range') or ''
+                        temp_general = load_info.get('temperature_requirements') or ''
+                        continuous = reefer.get('continuous_mode', False)
+                        precool = reefer.get('pre_cool_required', False)
+                        
+                        temp_lines = []
+                        if temp_setpoint and temp_setpoint.lower() != 'n/a':
+                            temp_lines.append(f"🎯 **Setpoint:** {temp_setpoint}")
+                        if temp_range and temp_range.lower() != 'n/a':
+                            temp_lines.append(f"📏 **Range:** {temp_range}")
+                        if temp_general and temp_general.lower() != 'n/a' and temp_general != temp_setpoint:
+                            temp_lines.append(f"📋 **Requirement:** {temp_general}")
+                        if continuous:
+                            temp_lines.append("🔄 **Mode:** Continuous")
+                        if precool:
+                            temp_lines.append("❄️ **Pre-Cool:** Required")
+                        
+                        if temp_lines:
+                            embed.add_field(
+                                name="🌡️ TEMPERATURE REQUIREMENTS",
+                                value="\n".join(temp_lines),
+                                inline=False
+                            )
+                            # Remove temp-related items from alerts to avoid duplication
+                            alerts = [a for a in alerts if 'temperature' not in a.lower() and 'temp ' not in a.lower() and 'reefer' not in a.lower()]
                         
                         broker_contact = []
                         if load_info.get('broker_email'): broker_contact.append(f"📧 {load_info['broker_email']}")

@@ -27,6 +27,9 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timezone
+import pytz
+
+TORONTO_TZ = pytz.timezone('America/Toronto')
 from typing import Any
 
 from google.oauth2 import service_account
@@ -105,7 +108,7 @@ def _append_row(
             "Copy the Sheet ID from the spreadsheet URL."
         )
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p EST")
     # Truncate preview to 250 chars to keep the sheet readable
     preview_truncated = email_preview[:250].strip().replace("\n", " ")
 
@@ -220,7 +223,7 @@ def _append_load_row(
 ) -> None:
     if not SPREADSHEET_ID:
         return
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.now(TORONTO_TZ).strftime("%Y-%m-%d %I:%M %p EST")
     row = [timestamp, load_id, broker, origin_dest, pickup_date, rate]
     service = _get_sheets_service()
     safe_tab = "'Loads Log'"

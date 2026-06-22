@@ -1,5 +1,8 @@
 import os
 from datetime import datetime
+import pytz
+
+TORONTO_TZ = pytz.timezone('America/Toronto')
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -28,7 +31,7 @@ def generate_invoice(load_id: str, broker_name: str, origin_dest: str, rate: str
     
     # Invoice Details
     c.setFont("Helvetica", 12)
-    c.drawString(450, height - 80, f"Date: {datetime.now().strftime('%b %d, %Y')}")
+    c.drawString(450, height - 80, f"Date: {datetime.now(TORONTO_TZ).strftime('%b %d, %Y')}")
     c.drawString(450, height - 100, f"Invoice #: INV-{load_id.replace('#', '')}")
     
     # Bill To

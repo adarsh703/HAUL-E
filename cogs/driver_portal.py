@@ -4,6 +4,7 @@ import logging
 import re
 import os
 import json
+import asyncio
 from sqlalchemy.future import select
 from google import genai
 
@@ -15,6 +16,51 @@ log = logging.getLogger("broker_bot.driver_portal")
 
 DRIVERS_CHANNEL_ID = 1517447020791468122
 NOTIFY_EMAIL = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
+
+
+class InvoiceApprovalView(discord.ui.View):
+    def __init__(self, load_id: str, pdf_path: str, bol_path: str, notify_email: str):
+        super().__init__(timeout=None)
+        self.load_id = load_id
+        self.pdf_path = pdf_path
+        self.bol_path = bol_path
+        self.notify_email = notify_email
+
+    @discord.ui.button(label="Email Invoice", style=discord.ButtonStyle.success, emoji="📧")
+    async def email_invoice(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        try:
+            from cogs.driver_portal import send_invoice_email
+            await send_invoice_email(
+                to=self.notify_email,
+                load_id=self.load_id,
+                pdf_path=self.pdf_path,
+                bol_path=self.bol_path
+            )
+            from database.models import AsyncSessionLocal, Load
+            async with AsyncSessionLocal() as session:
+                from sqlalchemy.future import select
+                result = await session.execute(select(Load).where(Load.load_id == self.load_id))
+                load = result.scalars().first()
+                if load:
+                    load.status = 'Invoiced'
+                    await session.commit()
+            
+            for child in self.children:
+                child.disabled = True
+            await interaction.edit_original_response(view=self)
+            await interaction.followup.send(f"✅ Invoice successfully emailed to {self.notify_email}! (Status: Invoiced)")
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to auto-invoice: {e}")
+            await interaction.followup.send(f"❌ Failed to email invoice: {e}")
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, emoji="✖️")
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send("Cancelled. The invoice was not emailed.")
 
 class DriverPortal(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -80,12 +126,18 @@ class DriverPortal(commands.Cog):
             prompt = f"""
 Analyze this message from a truck driver in a dispatch thread for Load {load_id}.
 Determine the driver's intent. Return a JSON object with key 'action'.
+
+CRITICAL: If a document/image is attached, classify it by its CONTENT:
+- If it's a Bill of Lading (BOL), shipping receipt, pickup confirmation, or any document showing freight was picked up → action is "loaded"
+- If it's a Proof of Delivery (POD), delivery receipt, signed delivery confirmation, or any document showing freight was delivered → action is "delivered"
+The driver does NOT need to type anything. The document alone is enough to determine the action.
+
 Possible actions:
-- "loaded" — driver says they've picked up the freight or attached a BOL (Bill of Lading). If an image/document is attached and it looks like a BOL/receipt, assume they are loaded.
-- "delivered" — driver says they've delivered or attached a POD (Proof of Delivery).
+- "loaded" — a BOL or pickup document is attached, OR driver says they've picked up
+- "delivered" — a POD or delivery document is attached, OR driver says they've delivered
 - "temp_response" — driver is responding to a temperature check (extract temp in 'temp_value')
 - "issue" — driver is reporting a problem
-- "unknown" — not a dispatch-related message
+- "unknown" — not a dispatch-related message and no recognizable document attached
 
 Return JSON like: {{"action": "loaded"}} or {{"action": "temp_response", "temp_value": "-2°F"}}
 Driver Message: "{content}"
@@ -138,18 +190,28 @@ Driver Message: "{content}"
                         except Exception as e:
                             log.error(f"Failed to save and email BOL: {e}")
 
-                    # Automatically start Temp Checks if it's a reefer load
+                    # Automatically start Temp Checks ONLY if it's a reefer load
                     try:
-                        import asyncio
                         from services.temp_checker import start_temp_checks
                         
-                        # We can check if it's a reefer load by looking at ops intel
-                        # For now, start it if the temp_check flag is not active
-                        if not load.temp_check_active:
-                            asyncio.create_task(start_temp_checks(load.load_id, getattr(load, 'driver_phone', None), interval_minutes=180))
+                        # Check if this load has temperature requirements
+                        is_reefer = False
+                        try:
+                            ops_data = json.loads(load.operational_intelligence) if load.operational_intelligence else {}
+                            reefer_ops = ops_data.get('reefer_operations', {})
+                            temp_setpoint = reefer_ops.get('temperature_setpoint', '')
+                            temp_req = ops_data.get('load_information', {}).get('temperature_requirements', '')
+                            if (temp_setpoint and temp_setpoint.lower() != 'n/a') or (temp_req and temp_req.lower() != 'n/a'):
+                                is_reefer = True
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+                        
+                        if is_reefer and not load.temp_check_active:
+                            await start_temp_checks(load.load_id, getattr(load, 'driver_phone', None), interval_minutes=180)
                             load.temp_check_active = True
                             await session.commit()
-                            log.info(f"Started temp checks for {load.load_id} after BOL receipt.")
+                            await message.reply(f"🌡️ **Reefer load detected** — temp checks started every 3 hours.")
+                            log.info(f"Started temp checks for reefer load {load.load_id} after BOL receipt.")
                     except Exception as e:
                         log.error(f"Failed to start temp checks: {e}")
 
@@ -159,7 +221,9 @@ Driver Message: "{content}"
                     await message.add_reaction("✅")
                     try:
                         from services.temp_checker import stop_temp_checks
-                        stop_temp_checks(load_id)
+                        await stop_temp_checks(load_id)
+                        load.temp_check_active = False
+                        await session.commit()
                     except Exception as e:
                         log.error(f"Failed to stop temp checks for load {load_id}: {e}")
                     # In a real app we might parse attached PODs here
@@ -191,16 +255,14 @@ Driver Message: "{content}"
                                 date=load.pickup_date
                             )
                             
-                            # Send Email to cavemann (you)
-                            await send_invoice_email(
-                                to=NOTIFY_EMAIL,
-                                load_id=load.load_id,
-                                pdf_path=pdf_path,
-                                bol_path=final_bol
+                            # Show in Discord and ask for approval
+                            view = InvoiceApprovalView(load.load_id, pdf_path, final_bol, NOTIFY_EMAIL)
+                            await message.reply(
+                                f"💸 **Invoice generated for Load #{load.load_id}!**\n"
+                                f"Should I email this invoice to `{NOTIFY_EMAIL}`?",
+                                file=discord.File(pdf_path),
+                                view=view
                             )
-                            load.status = 'Invoiced'
-                            await session.commit()
-                            await message.reply(f"💸 **Invoice generated and sent to {NOTIFY_EMAIL}!** (Status: Invoiced)")
                         except Exception as e:
                             log.error(f"Failed to auto-invoice: {e}", exc_info=True)
                             await message.reply(f"❌ Failed to generate/send invoice: {e}")
@@ -208,6 +270,30 @@ Driver Message: "{content}"
                 elif action == "temp_response":
                     temp_value = data.get("temp_value", content)
                     is_issue = "issue" in content.lower()
+                    is_out_of_range = False
+                    reported_temp_num = None
+                    required_temp_num = None
+
+                    reported_match = re.search(r'-?\d+', str(temp_value))
+                    if reported_match:
+                        reported_temp_num = float(reported_match.group())
+
+                    try:
+                        ops_data = json.loads(load.operational_intelligence) if load.operational_intelligence else {}
+                        reefer_ops = ops_data.get('reefer_operations', {})
+                        temp_setpoint = reefer_ops.get('temperature_setpoint', '')
+                        temp_req = ops_data.get('load_information', {}).get('temperature_requirements', '')
+                        
+                        req_str = str(temp_setpoint) if temp_setpoint and temp_setpoint.lower() != 'n/a' else str(temp_req)
+                        req_match = re.search(r'-?\d+', req_str)
+                        if req_match:
+                            required_temp_num = float(req_match.group())
+                    except Exception:
+                        pass
+                    
+                    if reported_temp_num is not None and required_temp_num is not None:
+                        if abs(reported_temp_num - required_temp_num) > 1:
+                            is_out_of_range = True
 
                     # Log the temp check response
                     from database.models import TempCheckLog
@@ -219,6 +305,10 @@ Driver Message: "{content}"
                     )
                     session.add(temp_log)
                     await session.commit()
+                    
+                    # Mark response received to avoid 15m timeout email
+                    from services.temp_checker import mark_temp_responded
+                    mark_temp_responded(load_id)
 
                     # Forward via email
                     try:
@@ -227,23 +317,80 @@ Driver Message: "{content}"
                             shipper_email=NOTIFY_EMAIL,
                             load_id=load_id,
                             driver_response=temp_value,
-                            is_issue=is_issue
+                            is_issue=is_issue,
+                            is_out_of_range=is_out_of_range,
+                            required_temp_num=required_temp_num,
+                            reported_temp_num=reported_temp_num
                         )
                     except Exception as e:
                         log.error(f"Failed to forward temp response email: {e}")
 
-                    emoji = "✅" if not is_issue else "⚠️"
+                    if is_out_of_range:
+                        emoji = "❌"
+                    elif is_issue:
+                        emoji = "⚠️"
+                    else:
+                        emoji = "✅"
+                        
                     await message.add_reaction(emoji)
                     await message.reply(f"{emoji} **Temp response logged** — `{temp_value}`\nForwarded to dispatch via email.")
 
                 elif action == "issue":
+                    # Forward via email
+                    try:
+                        from services.twilio_sms import forward_issue_email
+                        await forward_issue_email(
+                            shipper_email=NOTIFY_EMAIL,
+                            load_id=load_id,
+                            driver_message=content
+                        )
+                    except Exception as e:
+                        log.error(f"Failed to forward issue email: {e}")
+
                     await message.add_reaction("🚨")
-                    await message.reply("🚨 **Issue reported.** Dispatcher has been notified.")
-                    # Could add email notification here too
+                    await message.reply("🚨 **Issue reported.** Dispatcher has been notified via email.")
 
         else:
             # No load found for this thread — might be an old or manual thread
             log.warning(f"No load found for thread {message.channel.id}")
+
+    @discord.app_commands.command(name="set-temp-interval", description="Change the interval for temperature checks on a load")
+    @discord.app_commands.describe(
+        minutes="New interval in minutes",
+        load_id="Optional: The ID of the load. Automatically inferred if used in a load thread."
+    )
+    async def set_temp_interval(self, interaction: discord.Interaction, minutes: int, load_id: str = None):
+        if minutes < 1:
+            await interaction.response.send_message("❌ Interval must be at least 1 minute.", ephemeral=True)
+            return
+
+        if not load_id:
+            load_record = await self._find_load_for_thread(str(interaction.channel.id))
+            if load_record:
+                load_id = load_record.load_id
+            else:
+                await interaction.response.send_message("❌ Could not determine the load for this thread. Please specify `load_id`.", ephemeral=True)
+                return
+
+        from services.temp_checker import update_temp_interval
+        success = update_temp_interval(load_id, minutes)
+        
+        if success:
+            await interaction.response.send_message(f"✅ Temp check interval for load **{load_id}** updated to **{minutes} minutes**.")
+            
+            # Notify in the driver thread if it exists
+            load_record = None
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Load).where(Load.load_id == load_id))
+                load_record = result.scalars().first()
+                
+            if load_record and load_record.discord_thread_id:
+                thread = self.bot.get_channel(int(load_record.discord_thread_id))
+                if thread:
+                    await thread.send(f"⏱️ **Dispatcher Update:** Temperature check interval has been changed to every {minutes} minutes.")
+        else:
+            await interaction.response.send_message(f"❌ Could not find active temp checks for load **{load_id}**. Are they started?", ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(DriverPortal(bot))

@@ -49,6 +49,17 @@ def sync_fleet_from_motive():
     
     try:
         res = requests.get("https://api.keeptruckin.com/v1/vehicles", headers=headers, timeout=10)
+        loc_res = requests.get("https://api.keeptruckin.com/v1/vehicle_locations", headers=headers, timeout=10)
+        
+        odometers = {}
+        if loc_res.status_code == 200:
+            for v_data in loc_res.json().get("vehicles", []):
+                v = v_data.get("vehicle", {})
+                num = v.get("number")
+                loc = v.get("current_location")
+                if num and loc:
+                    odometers[num] = loc.get("odometer", 0)
+
         if res.status_code == 200:
             data = res.json()
             vehicles = []
@@ -67,8 +78,7 @@ def sync_fleet_from_motive():
                 model = v.get("model", "")
                 v_type = f"{make} {model}".strip() or "Semi Truck"
                 
-                loc = v.get("current_location") or {}
-                odometer = loc.get("odometer", 0)
+                odometer = odometers.get(unit_id, 0)
                 miles_str = f"{int(odometer):,}" if odometer else "0"
                 
                 status = "Active" if v.get("status") == "active" else "Maintenance"
