@@ -81,22 +81,31 @@ Return ONLY the email body you would reply with."""
         try:
             prompt = f"""
 You are the intelligence layer of a modern Transportation Management System (TMS).
-Extract load details from the provided text and return ONLY valid JSON.
-Do NOT include markdown formatting.
 
-Ensure the JSON has this structure:
+A user has forwarded a Rate Confirmation or load document via email.
+Your job is to create the most complete load record possible and enrich it with operational intelligence.
+The goal is not document extraction. The goal is to reduce dispatcher actions to near zero.
+
+# Generate Complete TMS Record
+Populate every possible field based on the text.
+
+Return structured JSON optimized for a web-based TMS application. DO NOT include markdown formatting.
+Ensure the JSON has the EXACT following structure, filling in values where found:
 {{
   "load_information": {{
     "broker_load_number": "",
     "customer": "",
+    "load_status": "",
     "load_type": "",
     "revenue": "",
     "equipment_type": "",
+    "trailer_requirements": "",
     "commodity": "",
     "weight": "",
+    "miles": "",
     "temperature_requirements": "",
-    "assigned_driver": "",
-    "assigned_truck": ""
+    "broker_phone": "",
+    "broker_email": ""
   }},
   "stops": [
     {{
@@ -104,32 +113,62 @@ Ensure the JSON has this structure:
       "company_name": "",
       "address": "",
       "city_state": "",
+      "coordinates": "",
+      "contact_name": "",
+      "phone": "",
+      "email": "",
+      "appointment_type": "",
       "appointment_date": "",
       "appointment_time": "",
-      "instructions": ""
+      "instructions": "",
+      "reference_numbers": []
     }}
+  ],
+  "references": [
+    {{"type": "PO Number", "value": ""}}
   ],
   "reefer_operations": {{
     "temperature_setpoint": "",
+    "temperature_range": "",
+    "frozen_chilled_produce": "",
     "continuous_mode": false,
+    "start_stop_mode": false,
     "pre_cool_required": false,
+    "temperature_printout_required": false,
     "temperature_monitoring_required": false
   }},
   "financials": {{
+    "linehaul": "",
+    "fsc": "",
+    "accessorials": "",
+    "detention_terms": "",
+    "layover_terms": "",
+    "tonu_terms": "",
     "total_revenue": ""
   }},
   "hard_copy_pod_required": false,
   "operational_intelligence": {{
-    "workflow_state": "Pending",
-    "dispatcher_summary": ""
+    "risk_analysis": {{"classification": "Low/Medium/High", "reason": ""}},
+    "missing_information": [],
+    "dispatch_readiness_score": 0,
+    "dispatcher_summary": "",
+    "automation_suggestions": [],
+    "database_relationships": [],
+    "alerts": [],
+    "workflow_state": "Pending" 
   }}
 }}
 
-CRITICAL: Check if the document mentions requiring a "hard copy" of the POD/Proof of Delivery.
-If yes, set "hard_copy_pod_required" to true.
+CRITICAL RULES:
+- For `stops[].city_state`, ONLY output the City and State (e.g., "Laredo, TX"). Do not include the street address or zip code here.
+- For `workflow_state`, ONLY use one of the following exact words: "Pending", "In Transit", "Delivered", or "Cancelled".
+- Check if the document mentions requiring a "hard copy" of the POD/Proof of Delivery. If yes, set "hard_copy_pod_required" to true.
+- For `operational_intelligence.alerts`, extract a comprehensive list of all penalties, fines, temperature rules, and equipment requirements. BUT you must synthesize them into clear, concise, actionable points. **CRITICAL FORMAT:** Each alert MUST be formatted with a short bolded heading, followed by a colon and the detail. Example: "**Temperature Control**: Maintain continuous reefer operation at 35F." Do not just copy/paste raw text; make it highly readable for a driver.
 
 Email Body Context:
 {user_text}
+
+Extract data directly from the attached document.
 """
             contents = [prompt] + doc_parts
             response = await self.gemini_client.aio.models.generate_content(
