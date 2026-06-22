@@ -27,14 +27,55 @@ log = logging.getLogger("broker_bot.temp_checker")
 _active_checks: Dict[str, Dict[str, Any]] = {}
 _bot = None  # Set via init_temp_checker
 
+import json
+import os
+
+STATE_FILE = "temp_checks_state.json"
+
+def _save_state():
+    try:
+        # Convert datetime to string for JSON serialization
+        serializable_checks = {}
+        for k, v in _active_checks.items():
+            serializable_checks[k] = {
+                "driver_phone": v.get("driver_phone"),
+                "interval_minutes": v.get("interval_minutes", 180),
+                "last_sent": v.get("last_sent").isoformat() if v.get("last_sent") else None,
+                "next_send": v.get("next_send").isoformat() if v.get("next_send") else None,
+                "awaiting_response": v.get("awaiting_response", False),
+                "last_check_sent": v.get("last_check_sent").isoformat() if v.get("last_check_sent") else None,
+            }
+        with open(STATE_FILE, "w") as f:
+            json.dump(serializable_checks, f)
+    except Exception as e:
+        log.error(f"Failed to save temp checks state: {e}")
+
+def _load_state():
+    if not os.path.exists(STATE_FILE):
+        return
+    try:
+        with open(STATE_FILE, "r") as f:
+            data = json.load(f)
+        for k, v in data.items():
+            _active_checks[k] = {
+                "driver_phone": v.get("driver_phone"),
+                "interval_minutes": v.get("interval_minutes", 180),
+                "last_sent": datetime.fromisoformat(v["last_sent"]) if v.get("last_sent") else None,
+                "next_send": datetime.fromisoformat(v["next_send"]) if v.get("next_send") else datetime.now(timezone.utc),
+                "awaiting_response": v.get("awaiting_response", False),
+                "last_check_sent": datetime.fromisoformat(v["last_check_sent"]) if v.get("last_check_sent") else None,
+            }
+        log.info(f"Loaded {len(_active_checks)} active temp checks from state file.")
+    except Exception as e:
+        log.error(f"Failed to load temp checks state: {e}")
 
 def init_temp_checker(bot):
     """Call this once at bot startup to give the temp checker access to the bot."""
     global _bot
     _bot = bot
+    _load_state()
     _start_loop()
     log.info("✅ Temp checker initialized")
-
 
 def _start_loop():
     """Start the background loop that checks every minute."""
@@ -58,11 +99,13 @@ async def _temp_loop():
             info["next_send"] = now + timedelta(minutes=info["interval_minutes"])
             info["awaiting_response"] = True
             info["last_check_sent"] = now
+            _save_state()
             
         # Check if waiting for response for more than 15 mins
         if info.get("awaiting_response") and info.get("last_check_sent"):
             if now >= info["last_check_sent"] + timedelta(minutes=15):
                 info["awaiting_response"] = False
+                _save_state()
                 log.warning("No temp response for Load %s after 15m. Sending email.", load_id)
                 import os
                 notify_email = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
@@ -89,12 +132,14 @@ async def _send_temp_check(load_id: str, driver_phone: str) -> None:
             if not load or not load.discord_thread_id:
                 log.warning("No Discord thread found for load %s — stopping temp checks.", load_id)
                 _active_checks.pop(load_id, None)
+                _save_state()
                 return
 
             # Stop if load is no longer in transit
             if load.status not in ('In Transit', 'Assigned', 'Dispatched'):
                 log.info("Load %s is '%s' — stopping temp checks.", load_id, load.status)
                 _active_checks.pop(load_id, None)
+                _save_state()
                 return
 
             thread_id = int(load.discord_thread_id)
@@ -106,6 +151,7 @@ async def _send_temp_check(load_id: str, driver_phone: str) -> None:
             except discord.NotFound:
                 log.warning("Could not find Discord thread %s for load %s", thread_id, load_id)
                 _active_checks.pop(load_id, None)
+                _save_state()
                 return
 
         await thread.send(
@@ -141,6 +187,7 @@ async def start_temp_checks(
         "last_sent": now,
         "next_send": now + timedelta(minutes=interval_minutes),
     }
+    _save_state()
 
     log.info(
         "🌡️  Temp checks started | Load: %s | Every %dm",
@@ -159,6 +206,7 @@ async def stop_temp_checks(load_id: str) -> None:
     """Stop recurring temperature checks for a load."""
     removed = _active_checks.pop(load_id, None)
     if removed:
+        _save_state()
         log.info("🛑 Temp checks stopped | Load: %s", load_id)
     else:
         log.warning("⚠️  No active temp checks for Load: %s (already stopped?)", load_id)
@@ -167,6 +215,7 @@ def mark_temp_responded(load_id: str) -> None:
     """Mark that the driver responded to the temp check."""
     if load_id in _active_checks:
         _active_checks[load_id]["awaiting_response"] = False
+        _save_state()
         log.info("✅ Marked temp check as responded for Load %s", load_id)
 
 def update_temp_interval(load_id: str, new_interval_minutes: int) -> bool:
@@ -175,6 +224,7 @@ def update_temp_interval(load_id: str, new_interval_minutes: int) -> bool:
         info = _active_checks[load_id]
         info["interval_minutes"] = new_interval_minutes
         info["next_send"] = info["last_sent"] + timedelta(minutes=new_interval_minutes)
+        _save_state()
         log.info(f"⏱️ Updated temp check interval for {load_id} to {new_interval_minutes}m")
         return True
     return False
