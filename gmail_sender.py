@@ -135,7 +135,7 @@ async def send_broker_email(
     log.info("Dispatching email | To: %s (%s) | Lane: %s", broker_name, to, lane)
     await asyncio.to_thread(_send_via_smtp, to, subject, body)
 
-def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str, bol_path: str = None) -> None:
+def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str, bol_path: str = None, pod_path: str = None) -> None:
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         raise EnvironmentError("GMAIL_USER or GMAIL_APP_PASSWORD is missing from .env.")
 
@@ -159,13 +159,27 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
             pdf_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
             msg.attach(pdf_attachment)
 
-    # Attach BOL Image
+    # Attach BOL
     if bol_path and os.path.exists(bol_path):
         with open(bol_path, "rb") as f:
-            from email.mime.image import MIMEImage
-            bol_attachment = MIMEImage(f.read())
+            if bol_path.lower().endswith('.pdf'):
+                bol_attachment = MIMEApplication(f.read(), _subtype="pdf")
+            else:
+                from email.mime.image import MIMEImage
+                bol_attachment = MIMEImage(f.read())
             bol_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(bol_path))
             msg.attach(bol_attachment)
+            
+    # Attach POD
+    if pod_path and os.path.exists(pod_path) and pod_path != bol_path:
+        with open(pod_path, "rb") as f:
+            if pod_path.lower().endswith('.pdf'):
+                pod_attachment = MIMEApplication(f.read(), _subtype="pdf")
+            else:
+                from email.mime.image import MIMEImage
+                pod_attachment = MIMEImage(f.read())
+            pod_attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pod_path))
+            msg.attach(pod_attachment)
 
     with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
         server.ehlo()
@@ -174,10 +188,10 @@ def _send_invoice_via_smtp(to: str, subject: str, plain_body: str, pdf_path: str
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         server.sendmail(GMAIL_USER, [to, GMAIL_USER], msg.as_string())
 
-async def send_invoice_email(to: str, load_id: str, pdf_path: str, bol_path: str = None) -> None:
-    subject = f"Invoice & POD — Load {load_id} — {COMPANY_NAME}"
-    body = f"Hello,\n\nPlease find attached the Invoice and Proof of Delivery for Load {load_id}.\n\nThank you,\n{COMPANY_NAME}"
-    await asyncio.to_thread(_send_invoice_via_smtp, to, subject, body, pdf_path, bol_path)
+async def send_invoice_email(to: str, load_id: str, pdf_path: str, bol_path: str = None, pod_path: str = None) -> None:
+    subject = f"Invoice & Documents — Load {load_id} — {COMPANY_NAME}"
+    body = f"Hello,\n\nPlease find attached the Invoice, BOL, and Proof of Delivery for Load {load_id}.\n\nThank you,\n{COMPANY_NAME}"
+    await asyncio.to_thread(_send_invoice_via_smtp, to, subject, body, pdf_path, bol_path, pod_path)
 
 def _send_bol_via_smtp(to: str, subject: str, plain_body: str, bol_path: str) -> None:
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:

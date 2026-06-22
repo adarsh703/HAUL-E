@@ -19,11 +19,12 @@ NOTIFY_EMAIL = os.getenv("GMAIL_USER", "cavemann177@gmail.com")
 
 
 class InvoiceApprovalView(discord.ui.View):
-    def __init__(self, load_id: str, pdf_path: str, bol_path: str, notify_email: str):
+    def __init__(self, load_id: str, pdf_path: str, bol_path: str, pod_path: str, notify_email: str):
         super().__init__(timeout=None)
         self.load_id = load_id
         self.pdf_path = pdf_path
         self.bol_path = bol_path
+        self.pod_path = pod_path
         self.notify_email = notify_email
 
     @discord.ui.button(label="Email Invoice", style=discord.ButtonStyle.success, emoji="📧")
@@ -35,7 +36,8 @@ class InvoiceApprovalView(discord.ui.View):
                 to=self.notify_email,
                 load_id=self.load_id,
                 pdf_path=self.pdf_path,
-                bol_path=self.bol_path
+                bol_path=self.bol_path,
+                pod_path=self.pod_path
             )
             from database.models import AsyncSessionLocal, Load
             async with AsyncSessionLocal() as session:
@@ -259,7 +261,7 @@ Has BOL: "{has_bol}"
                             )
                             
                             # Show in Discord and ask for approval
-                            view = InvoiceApprovalView(load.load_id, pdf_path, final_bol, NOTIFY_EMAIL)
+                            view = InvoiceApprovalView(load.load_id, pdf_path, final_bol, pod_path, NOTIFY_EMAIL)
                             await message.reply(
                                 f"💸 **Invoice generated for Load #{load.load_id}!**\n"
                                 f"Should I email this invoice to `{NOTIFY_EMAIL}`?",
