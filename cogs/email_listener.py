@@ -199,7 +199,12 @@ Email Body Context:
                         # Save the attachment
                         file_ext = os.path.splitext(filename)[1]
                         saved_filename = f"{uuid.uuid4().hex}{file_ext}"
-                        saved_filepath = os.path.join("/home/no_one/Desktop/broker-bot/uploads", saved_filename)
+                        
+                        # Ensure uploads directory exists
+                        uploads_dir = os.path.join(os.getcwd(), "uploads")
+                        os.makedirs(uploads_dir, exist_ok=True)
+                        
+                        saved_filepath = os.path.join(uploads_dir, saved_filename)
                         with open(saved_filepath, "wb") as f:
                             f.write(file_bytes)
                         saved_documents.append(f"{os.getenv('VITE_API_URL', 'http://127.0.0.1:20296')}/uploads/{saved_filename}")
